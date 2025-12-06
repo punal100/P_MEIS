@@ -1,0 +1,28 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "Modular Enhanced Input System",
+	"Description": "Modular Enhanced Input System",
+	"Category": "Input",
+	"CreatedBy": "Punal Manalan",
+	"CreatedByURL": "https://github.com/punal100/P_MEIS",
+	"DocsURL": "https://github.com/punal100/P_MEIS",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/punal100/P_MEIS",
+	"CanContainContent": true,
+	"Installed": false,
+	"Plugins": [
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		}
+	],
+	"Modules": [
+		{
+			"Name": "P_MEIS",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
