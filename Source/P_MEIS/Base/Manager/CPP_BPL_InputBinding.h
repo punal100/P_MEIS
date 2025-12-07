@@ -543,6 +543,90 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Input Binding|Async")
     static void StopWaitingForInputAction(UAsyncAction_WaitForInputAction *AsyncAction);
 
+    // ==================== Section 0.9: Dynamic Modifiers & Triggers ====================
+
+    /**
+     * Set the dead zone for an action's modifiers
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @param LowerThreshold Input below this is ignored (0.0-1.0)
+     * @param UpperThreshold Input above this is clamped to 1.0 (default 1.0)
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Modifiers")
+    static bool SetActionDeadZone(APlayerController *PlayerController, const FName &ActionName, float LowerThreshold, float UpperThreshold = 1.0f);
+
+    /**
+     * Set the sensitivity (scale) for an action
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @param Sensitivity Multiplier for input values
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Modifiers")
+    static bool SetActionSensitivity(APlayerController *PlayerController, const FName &ActionName, float Sensitivity);
+
+    /**
+     * Set sensitivity per axis for an action
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @param Sensitivity Multiplier per axis (X, Y, Z)
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Modifiers")
+    static bool SetActionSensitivityPerAxis(APlayerController *PlayerController, const FName &ActionName, FVector Sensitivity);
+
+    /**
+     * Set invert Y axis for an action (common for "Invert Look" option)
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @param bInvert Whether to invert the Y axis
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Modifiers")
+    static bool SetActionInvertY(APlayerController *PlayerController, const FName &ActionName, bool bInvert);
+
+    /**
+     * Set a hold trigger on a key mapping (requires holding for duration)
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @param Key The key to modify
+     * @param HoldTime How long to hold before triggering (seconds)
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Triggers")
+    static bool SetKeyHoldTrigger(APlayerController *PlayerController, const FName &ActionName, const FKey &Key, float HoldTime);
+
+    /**
+     * Set a tap trigger on a key mapping (quick press and release)
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @param Key The key to modify
+     * @param MaxTapTime Maximum time between press and release for tap (seconds)
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Triggers")
+    static bool SetKeyTapTrigger(APlayerController *PlayerController, const FName &ActionName, const FKey &Key, float MaxTapTime);
+
+    /**
+     * Clear all triggers from a key mapping (revert to default behavior)
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @param Key The key to modify
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Triggers")
+    static bool ClearKeyTriggers(APlayerController *PlayerController, const FName &ActionName, const FKey &Key);
+
+    /**
+     * Clear all modifiers from an action
+     * @param PlayerController The player
+     * @param ActionName Name of the action
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Modifiers")
+    static bool ClearActionModifiers(APlayerController *PlayerController, const FName &ActionName);
+
     // ==================== Helper Functions ======================================
 
     UFUNCTION(BlueprintPure, Category = "Input Binding|Utility")

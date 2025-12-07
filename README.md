@@ -411,6 +411,165 @@ UCPP_BPL_InputBinding::StopWaitingForInputAction(JumpListener);
 
 ---
 
+## 🎛️ Dynamic Input Modifiers & Triggers
+
+P_MEIS provides full runtime control over UE5 Enhanced Input **Modifiers** (process input values) and **Triggers** (control when actions fire). This enables features like:
+
+- **Dead Zones** - Ignore small stick movements
+- **Sensitivity** - Scale input per-axis (mouse sensitivity, stick sensitivity)
+- **Invert Y** - Flip vertical look axis
+- **Hold/Tap/Pulse** - Different trigger behaviors at runtime
+- **Chord Actions** - Require modifier keys (Sprint+Jump)
+
+### Modifier Types
+
+| Modifier Type              | Description                                            |
+| -------------------------- | ------------------------------------------------------ |
+| `DeadZone`                 | Ignore input below threshold (great for analog sticks) |
+| `Scale`                    | Multiply input per-axis (sensitivity)                  |
+| `Negate`                   | Invert axes (Invert Y look)                            |
+| `Swizzle`                  | Reorder axes (swap X/Y)                                |
+| `ResponseCurveExponential` | Non-linear response curve for more control             |
+| `SmoothDelta`              | Smooth input over time                                 |
+| `FOVScaling`               | Adjust sensitivity based on camera FOV                 |
+| `ToWorldSpace`             | Transform input to world space                         |
+| `ScaleByDeltaTime`         | Frame-rate independent scaling                         |
+
+### Trigger Types
+
+| Trigger Type     | Description                                          |
+| ---------------- | ---------------------------------------------------- |
+| `Down`           | Fire continuously while input is held (default)      |
+| `Pressed`        | Fire once on initial press                           |
+| `Released`       | Fire once on release                                 |
+| `Hold`           | Fire after holding for specified duration            |
+| `HoldAndRelease` | Fire on release after holding for specified duration |
+| `Tap`            | Fire if pressed and released quickly                 |
+| `Pulse`          | Fire repeatedly at interval while held               |
+| `ChordAction`    | Require another action to be active (modifier keys)  |
+
+### Quick Setup Examples
+
+**Setting Dead Zone and Sensitivity:**
+
+```cpp
+// Blueprint-friendly: Set action-level dead zone
+UCPP_BPL_InputBinding::SetActionDeadZone(PC, "IA_Move", 0.2f, 1.0f, EP_MEIS_DeadZoneType::Radial);
+
+// Set sensitivity (scale) per axis
+UCPP_BPL_InputBinding::SetActionSensitivityPerAxis(PC, "IA_Look", FVector(2.0f, 1.5f, 1.0f));
+
+// Invert Y axis for "Invert Look" option
+UCPP_BPL_InputBinding::SetActionInvertY(PC, "IA_Look", true);
+```
+
+**Setting Hold Trigger for Charge Attack:**
+
+```cpp
+// Make action require 0.5 second hold
+UCPP_BPL_InputBinding::SetKeyHoldTrigger(PC, "IA_ChargeAttack", "LeftMouseButton", 0.5f, true);
+
+// Set tap trigger for quick actions
+UCPP_BPL_InputBinding::SetKeyTapTrigger(PC, "IA_Dodge", "SpaceBar", 0.2f);
+```
+
+### Advanced Modifier Configuration
+
+Use `FS_InputModifierConfig` for full control:
+
+```cpp
+// Create a comprehensive modifier config
+FS_InputModifierConfig DeadZoneConfig = FS_InputModifierConfig::MakeDeadZone(
+    0.15f,  // Lower threshold
+    1.0f,   // Upper threshold
+    EP_MEIS_DeadZoneType::Radial
+);
+
+// Add to action
+UCPP_BPL_InputBinding::AddModifierToAction(PC, "IA_Move", DeadZoneConfig);
+
+// Create sensitivity modifier
+FS_InputModifierConfig SensitivityConfig = FS_InputModifierConfig::MakeScale(FVector(2.0f, 2.0f, 1.0f));
+UCPP_BPL_InputBinding::AddModifierToAction(PC, "IA_Look", SensitivityConfig);
+
+// Create exponential response curve (more precision near center)
+FS_InputModifierConfig CurveConfig = FS_InputModifierConfig::MakeResponseCurve(FVector(2.0f, 2.0f, 1.0f));
+UCPP_BPL_InputBinding::AddModifierToAction(PC, "IA_Look", CurveConfig);
+```
+
+### Per-Key Mapping Modifiers
+
+Override modifiers for specific key mappings (different settings for mouse vs gamepad):
+
+```cpp
+// Mouse look: high sensitivity
+FS_InputModifierConfig MouseSensitivity = FS_InputModifierConfig::MakeScale(FVector(3.0f, 2.0f, 1.0f));
+UCPP_BPL_InputBinding::AddModifierToKeyMapping(PC, "IA_Look", "Mouse2D", MouseSensitivity);
+
+// Gamepad look: lower sensitivity with dead zone
+FS_InputModifierConfig GamepadSensitivity = FS_InputModifierConfig::MakeScale(FVector(1.5f, 1.5f, 1.0f));
+UCPP_BPL_InputBinding::AddModifierToKeyMapping(PC, "IA_Look", "Gamepad_RightStick_2D", GamepadSensitivity);
+
+FS_InputModifierConfig GamepadDeadZone = FS_InputModifierConfig::MakeDeadZone(0.2f);
+UCPP_BPL_InputBinding::AddModifierToKeyMapping(PC, "IA_Look", "Gamepad_RightStick_2D", GamepadDeadZone);
+```
+
+### Advanced Trigger Configuration
+
+Use `FS_InputTriggerConfig` for full control:
+
+```cpp
+// Create hold trigger config
+FS_InputTriggerConfig HoldConfig = FS_InputTriggerConfig::MakeHold(
+    1.0f,   // Hold for 1 second
+    true    // One-shot (fires once when threshold met)
+);
+UCPP_BPL_InputBinding::AddTriggerToKeyMapping(PC, "IA_Interact", "E", HoldConfig);
+
+// Create pulse trigger for rapid fire
+FS_InputTriggerConfig PulseConfig = FS_InputTriggerConfig::MakePulse(
+    0.1f,   // Fire every 0.1 seconds
+    0,      // Unlimited pulses
+    true    // Fire immediately on press
+);
+UCPP_BPL_InputBinding::AddTriggerToKeyMapping(PC, "IA_Fire", "LeftMouseButton", PulseConfig);
+
+// Create chord trigger (requires Sprint to be held)
+FS_InputTriggerConfig ChordConfig = FS_InputTriggerConfig::MakeChord(FName("IA_Sprint"));
+UCPP_BPL_InputBinding::AddTriggerToKeyMapping(PC, "IA_Slide", "LeftControl", ChordConfig);
+```
+
+### Modifier Helper Functions (Static Constructors)
+
+`FS_InputModifierConfig` provides convenient static constructors:
+
+| Function                           | Description                          |
+| ---------------------------------- | ------------------------------------ |
+| `MakeDeadZone(Lower, Upper, Type)` | Create dead zone modifier            |
+| `MakeScale(FVector)`               | Create per-axis sensitivity modifier |
+| `MakeUniformScale(float)`          | Create uniform sensitivity modifier  |
+| `MakeNegate(X, Y, Z)`              | Create axis inversion modifier       |
+| `MakeInvertY()`                    | Convenience for Y-axis inversion     |
+| `MakeSwizzle(Order)`               | Create axis reorder modifier         |
+| `MakeResponseCurve(FVector)`       | Create exponential response curve    |
+
+### Trigger Helper Functions (Static Constructors)
+
+`FS_InputTriggerConfig` provides convenient static constructors:
+
+| Function                            | Description                   |
+| ----------------------------------- | ----------------------------- |
+| `MakeDown(Actuation)`               | Fire while held (default)     |
+| `MakePressed(Actuation)`            | Fire once on press            |
+| `MakeReleased(Actuation)`           | Fire once on release          |
+| `MakeHold(Time, bOneShot)`          | Fire after holding            |
+| `MakeHoldAndRelease(Time)`          | Fire on release after holding |
+| `MakeTap(MaxTime)`                  | Fire on quick press-release   |
+| `MakePulse(Interval, Limit, Start)` | Fire repeatedly while held    |
+| `MakeChord(ActionName)`             | Require another action        |
+
+---
+
 ## 📁 Folder Structure
 
 ```
@@ -425,9 +584,10 @@ P_MEIS/
     │   ├── InputBinding/       # Data structures
     │   │   ├── FS_InputActionBinding.h
     │   │   ├── FS_InputAxisBinding.h
-    │   │   ├── FS_InputModifier.h
+    │   │   ├── FS_InputModifier.h           # Modifier configs (DeadZone, Scale, Negate, etc.)
+    │   │   ├── FS_InputTriggerConfig.h      # NEW: Trigger configs (Hold, Tap, Pulse, etc.)
     │   │   ├── FS_InputProfile.h
-    │   │   └── FS_PlayerInputData.h    # NEW: Per-player data struct
+    │   │   └── FS_PlayerInputData.h         # Per-player data struct
     │   ├── Manager/            # Core systems
     │   │   ├── CPP_InputBindingManager.h/cpp  # Central manager
     │   │   ├── CPP_BPL_InputBinding.h/cpp     # Blueprint library
@@ -440,7 +600,7 @@ P_MEIS/
     │   ├── Validation/         # Input validation
     │   │   └── CPP_InputValidator.h/cpp
     │   └── Integration/        # Enhanced Input bridge
-    │       ├── CPP_EnhancedInputIntegration.h/cpp      # Integration wrapper + Global Dispatchers
+    │       ├── CPP_EnhancedInputIntegration.h/cpp      # Integration wrapper + Modifier/Trigger management
     │       └── CPP_AsyncAction_WaitForInputAction.h/cpp # Async Blueprint node (Approach C)
     ├── Private/
     │   └── P_MEIS.cpp
@@ -498,6 +658,33 @@ P_MEIS/
 | `IsValidKeyString(String)`                         | Check if key string is valid    |
 | `GetAllKeyNames()`                                 | Get list of all valid key names |
 | `MakeKeyBinding(KeyString, Shift, Ctrl, Alt, Cmd)` | Create key binding struct       |
+
+### Modifiers & Triggers (Per-Player)
+
+| Function                                                        | Description                               |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| `AddModifierToAction(PC, ActionName, ModifierConfig)`           | Add modifier to action (all key mappings) |
+| `RemoveModifierFromAction(PC, ActionName, ModifierType)`        | Remove modifier type from action          |
+| `ClearActionModifiers(PC, ActionName)`                          | Remove all modifiers from action          |
+| `GetActionModifiers(PC, ActionName)`                            | Get current action modifiers              |
+| `AddModifierToKeyMapping(PC, ActionName, KeyString, Config)`    | Add modifier to specific key mapping      |
+| `RemoveModifierFromKeyMapping(PC, ActionName, KeyString, Type)` | Remove modifier from key mapping          |
+| `ClearKeyMappingModifiers(PC, ActionName, KeyString)`           | Clear all modifiers from key mapping      |
+| `AddTriggerToKeyMapping(PC, ActionName, KeyString, Config)`     | Add trigger to key mapping                |
+| `RemoveTriggerFromKeyMapping(PC, ActionName, KeyString, Type)`  | Remove trigger from key mapping           |
+| `ClearKeyMappingTriggers(PC, ActionName, KeyString)`            | Clear all triggers from key mapping       |
+| `SetKeyMappingTrigger(PC, ActionName, KeyString, Config)`       | Replace all triggers with single trigger  |
+
+### Modifier Convenience Functions (Per-Player)
+
+| Function                                                   | Description                     |
+| ---------------------------------------------------------- | ------------------------------- |
+| `SetActionDeadZone(PC, ActionName, Lower, Upper, Type)`    | Set dead zone for action        |
+| `SetActionSensitivity(PC, ActionName, Sensitivity)`        | Set uniform sensitivity         |
+| `SetActionSensitivityPerAxis(PC, ActionName, ScaleVec)`    | Set per-axis sensitivity        |
+| `SetActionInvertY(PC, ActionName, bInvert)`                | Enable/disable Y-axis inversion |
+| `SetKeyHoldTrigger(PC, ActionName, KeyString, Time, Once)` | Set hold trigger on key mapping |
+| `SetKeyTapTrigger(PC, ActionName, KeyString, MaxTime)`     | Set tap trigger on key mapping  |
 
 ### Async Action Binding (Per-Action Events)
 
@@ -560,6 +747,8 @@ Profiles are saved as JSON in: `[Project]/Saved/InputProfiles/`
 
 ## ⚡ Advanced Features
 
+- **Dynamic Input Modifiers** - Runtime control of DeadZone, Sensitivity, Invert Y, Response Curves, FOV Scaling
+- **Dynamic Input Triggers** - Runtime control of Hold, Tap, Pulse, Chord triggers per key mapping
 - **Blueprint Action Binding** - Two approaches: Global Dispatchers (A) and Async Nodes (C) for per-action events
 - **Modifier Key Bindings** - Support for Shift+Key, Ctrl+Key, Alt+Key combinations via UInputTriggerChordAction
 - **Deferred Binding** - Actions queued when InputComponent not ready; bind later with TryBindPendingActions()
@@ -595,5 +784,5 @@ See LICENSE file for details.
 
 ---
 
-**Version:** 3.1  
+**Version:** 3.2  
 **Last Updated:** December 7, 2025

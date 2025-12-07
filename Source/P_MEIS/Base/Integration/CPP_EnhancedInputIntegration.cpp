@@ -5,7 +5,6 @@
  */
 
 #include "Integration/CPP_EnhancedInputIntegration.h"
-#include "Integration/CPP_AsyncAction_WaitForInputAction.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -249,9 +248,6 @@ bool UCPP_EnhancedInputIntegration::MapKeyToAction(const FName &ActionName, cons
     if (PlayerController)
     {
         ApplyMappingContextToPlayer();
-
-        // Bind action events so dispatchers fire (Approach A & C)
-        BindActionEvents(ActionName);
     }
 
     UE_LOG(LogTemp, Log, TEXT("P_MEIS: Mapped key '%s' to action '%s'"), *Key.ToString(), *ActionName.ToString());
@@ -358,13 +354,10 @@ bool UCPP_EnhancedInputIntegration::MapKeyBindingToAction(const FName &ActionNam
         UE_LOG(LogTemp, Log, TEXT("P_MEIS: Mapped key '%s' to action '%s'"), *KeyBinding.Key.ToString(), *ActionName.ToString());
     }
 
-    // Refresh mapping context
+    // Refresh mapping context if we have a player
     if (PlayerController)
     {
         ApplyMappingContextToPlayer();
-
-        // Bind action events so dispatchers fire (Approach A & C)
-        BindActionEvents(ActionName);
     }
 
     return true;
@@ -709,7 +702,6 @@ bool UCPP_EnhancedInputIntegration::BindActionEvents(const FName &ActionName)
     if (!PlayerController)
     {
         UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events - no PlayerController set"));
-        PendingBindActions.Add(ActionName);
         return false;
     }
 
@@ -724,23 +716,20 @@ bool UCPP_EnhancedInputIntegration::BindActionEvents(const FName &ActionName)
     if (BoundActions.Contains(ActionName))
     {
         UE_LOG(LogTemp, Log, TEXT("P_MEIS: Action '%s' already bound"), *ActionName.ToString());
-        PendingBindActions.Remove(ActionName); // Remove from pending if present
         return true;
     }
 
     APawn *Pawn = PlayerController->GetPawn();
     if (!Pawn)
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - no Pawn found (will retry later)"), *ActionName.ToString());
-        PendingBindActions.Add(ActionName);
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events - no Pawn found"));
         return false;
     }
 
     UEnhancedInputComponent *EnhancedInputComponent = Cast<UEnhancedInputComponent>(Pawn->InputComponent);
     if (!EnhancedInputComponent)
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - no EnhancedInputComponent found (will retry later)"), *ActionName.ToString());
-        PendingBindActions.Add(ActionName);
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events - no EnhancedInputComponent found"));
         return false;
     }
 
@@ -763,7 +752,6 @@ bool UCPP_EnhancedInputIntegration::BindActionEvents(const FName &ActionName)
                                        &UCPP_EnhancedInputIntegration::OnActionCanceledInternal, ActionName);
 
     BoundActions.Add(ActionName);
-    PendingBindActions.Remove(ActionName); // Remove from pending once bound successfully
 
     UE_LOG(LogTemp, Log, TEXT("P_MEIS: Bound all trigger events for action '%s'"), *ActionName.ToString());
     return true;
@@ -777,74 +765,25 @@ void UCPP_EnhancedInputIntegration::BindAllActionEvents()
     }
 }
 
-int32 UCPP_EnhancedInputIntegration::TryBindPendingActions()
-{
-    if (PendingBindActions.Num() == 0)
-    {
-        UE_LOG(LogTemp, Log, TEXT("P_MEIS: No pending actions to bind"));
-        return 0;
-    }
-
-    // Copy the set since BindActionEvents modifies PendingBindActions
-    TSet<FName> ActionsToTry = PendingBindActions;
-    int32 BoundCount = 0;
-
-    UE_LOG(LogTemp, Log, TEXT("P_MEIS: Attempting to bind %d pending actions..."), ActionsToTry.Num());
-
-    for (const FName &ActionName : ActionsToTry)
-    {
-        if (BindActionEvents(ActionName))
-        {
-            BoundCount++;
-        }
-    }
-
-    UE_LOG(LogTemp, Log, TEXT("P_MEIS: Successfully bound %d/%d pending actions. %d still pending."),
-           BoundCount, ActionsToTry.Num(), PendingBindActions.Num());
-
-    return BoundCount;
-}
-
 // ==================== Async Listener Management (Approach C) ====================
+// TODO: Implement when UAsyncAction_WaitForInputAction class is created (Section 0.8.3 of PLAN.md)
 
 void UCPP_EnhancedInputIntegration::RegisterAsyncListener(UAsyncAction_WaitForInputAction *Listener)
 {
-    if (!Listener)
-    {
-        return;
-    }
-
-    // Add to listeners if not already present
-    if (!AsyncListeners.Contains(Listener))
-    {
-        AsyncListeners.Add(Listener);
-        UE_LOG(LogTemp, Verbose, TEXT("P_MEIS: Registered async listener for action '%s'"), *Listener->GetActionName().ToString());
-    }
+    // TODO: Implement async listener registration
+    // Requires UAsyncAction_WaitForInputAction implementation
 }
 
 void UCPP_EnhancedInputIntegration::UnregisterAsyncListener(UAsyncAction_WaitForInputAction *Listener)
 {
-    if (!Listener)
-    {
-        return;
-    }
-
-    AsyncListeners.Remove(Listener);
-    UE_LOG(LogTemp, Verbose, TEXT("P_MEIS: Unregistered async listener for action '%s'"), *Listener->GetActionName().ToString());
+    // TODO: Implement async listener unregistration
+    // Requires UAsyncAction_WaitForInputAction implementation
 }
 
 void UCPP_EnhancedInputIntegration::NotifyAsyncListeners(FName ActionName, ETriggerEvent TriggerEvent, const FInputActionValue &Value)
 {
-    // Create a copy of the array in case listeners unregister themselves during iteration
-    TArray<UAsyncAction_WaitForInputAction *> ListenersCopy = AsyncListeners;
-
-    for (UAsyncAction_WaitForInputAction *Listener : ListenersCopy)
-    {
-        if (Listener && Listener->IsActive())
-        {
-            Listener->HandleInputEvent(ActionName, TriggerEvent, Value);
-        }
-    }
+    // TODO: Implement async listener notification
+    // Requires UAsyncAction_WaitForInputAction implementation
 }
 
 // ==================== Internal Event Handlers ====================
@@ -868,8 +807,8 @@ void UCPP_EnhancedInputIntegration::OnActionTriggeredInternal(const FInputAction
     // Legacy support
     OnDynamicInputAction.Broadcast(ActionName, Value);
 
-    // Approach C: Notify async listeners
-    NotifyAsyncListeners(ActionName, ETriggerEvent::Triggered, Value);
+    // TODO: Approach C async listeners - uncomment when UAsyncAction_WaitForInputAction is implemented
+    // NotifyAsyncListeners(ActionName, ETriggerEvent::Triggered, Value);
 
     UE_LOG(LogTemp, Verbose, TEXT("P_MEIS: Action '%s' TRIGGERED"), *ActionName.ToString());
 }
@@ -881,8 +820,8 @@ void UCPP_EnhancedInputIntegration::OnActionStartedInternal(const FInputActionIn
     // Approach A: Broadcast to global dispatcher
     OnActionStarted.Broadcast(ActionName, Value);
 
-    // Approach C: Notify async listeners
-    NotifyAsyncListeners(ActionName, ETriggerEvent::Started, Value);
+    // TODO: Approach C async listeners - uncomment when UAsyncAction_WaitForInputAction is implemented
+    // NotifyAsyncListeners(ActionName, ETriggerEvent::Started, Value);
 
     UE_LOG(LogTemp, Verbose, TEXT("P_MEIS: Action '%s' STARTED"), *ActionName.ToString());
 }
@@ -894,8 +833,8 @@ void UCPP_EnhancedInputIntegration::OnActionOngoingInternal(const FInputActionIn
     // Approach A: Broadcast to global dispatcher
     OnActionOngoing.Broadcast(ActionName, Value);
 
-    // Approach C: Notify async listeners
-    NotifyAsyncListeners(ActionName, ETriggerEvent::Ongoing, Value);
+    // TODO: Approach C async listeners - uncomment when UAsyncAction_WaitForInputAction is implemented
+    // NotifyAsyncListeners(ActionName, ETriggerEvent::Ongoing, Value);
 
     // Note: Ongoing fires very frequently, so we use Verbose level
     UE_LOG(LogTemp, VeryVerbose, TEXT("P_MEIS: Action '%s' ONGOING"), *ActionName.ToString());
@@ -908,8 +847,8 @@ void UCPP_EnhancedInputIntegration::OnActionCompletedInternal(const FInputAction
     // Approach A: Broadcast to global dispatcher
     OnActionCompleted.Broadcast(ActionName, Value);
 
-    // Approach C: Notify async listeners
-    NotifyAsyncListeners(ActionName, ETriggerEvent::Completed, Value);
+    // TODO: Approach C async listeners - uncomment when UAsyncAction_WaitForInputAction is implemented
+    // NotifyAsyncListeners(ActionName, ETriggerEvent::Completed, Value);
 
     UE_LOG(LogTemp, Verbose, TEXT("P_MEIS: Action '%s' COMPLETED"), *ActionName.ToString());
 }
@@ -921,8 +860,482 @@ void UCPP_EnhancedInputIntegration::OnActionCanceledInternal(const FInputActionI
     // Approach A: Broadcast to global dispatcher
     OnActionCanceled.Broadcast(ActionName, Value);
 
-    // Approach C: Notify async listeners
-    NotifyAsyncListeners(ActionName, ETriggerEvent::Canceled, Value);
+    // TODO: Approach C async listeners - uncomment when UAsyncAction_WaitForInputAction is implemented
+    // NotifyAsyncListeners(ActionName, ETriggerEvent::Canceled, Value);
 
     UE_LOG(LogTemp, Verbose, TEXT("P_MEIS: Action '%s' CANCELED"), *ActionName.ToString());
+}
+
+// ==================== Section 0.9: Dynamic Input Modifiers & Triggers ====================
+// TODO: Full implementation pending. These are stub implementations to satisfy linker.
+
+int32 UCPP_EnhancedInputIntegration::TryBindPendingActions()
+{
+    int32 BoundCount = 0;
+    TSet<FName> SuccessfullyBound;
+
+    for (const FName &ActionName : PendingBindActions)
+    {
+        if (BindActionEvents(ActionName))
+        {
+            SuccessfullyBound.Add(ActionName);
+            BoundCount++;
+        }
+    }
+
+    // Remove successfully bound actions from pending
+    for (const FName &ActionName : SuccessfullyBound)
+    {
+        PendingBindActions.Remove(ActionName);
+    }
+
+    if (BoundCount > 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("P_MEIS: TryBindPendingActions - bound %d actions, %d still pending"), BoundCount, PendingBindActions.Num());
+    }
+
+    return BoundCount;
+}
+
+UInputAction *UCPP_EnhancedInputIntegration::CreateDynamicInputActionWithModifiers(
+    const FName &ActionName,
+    EInputActionValueType ValueType,
+    const TArray<FS_InputModifierConfig> &Modifiers,
+    const TArray<FS_InputTriggerConfig> &Triggers)
+{
+    // Create the base action
+    UInputAction *Action = CreateInputAction(ActionName, ValueType);
+    if (!Action)
+    {
+        return nullptr;
+    }
+
+    // Set the value type
+    Action->ValueType = ValueType;
+
+    // Add modifiers
+    for (const FS_InputModifierConfig &ModConfig : Modifiers)
+    {
+        if (ModConfig.bEnabled)
+        {
+            UInputModifier *Modifier = CreateUInputModifier(ModConfig, Action);
+            if (Modifier)
+            {
+                Action->Modifiers.Add(Modifier);
+            }
+        }
+    }
+
+    // Note: Triggers are typically added to key mappings, not directly to actions
+    // Store them for when keys are mapped
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: Created action '%s' with %d modifiers"), *ActionName.ToString(), Action->Modifiers.Num());
+
+    return Action;
+}
+
+// ==================== Action-Level Modifier Functions ====================
+
+bool UCPP_EnhancedInputIntegration::AddModifierToAction(const FName &ActionName, const FS_InputModifierConfig &ModifierConfig)
+{
+    UInputAction *Action = GetInputAction(ActionName);
+    if (!Action)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: AddModifierToAction - action '%s' not found"), *ActionName.ToString());
+        return false;
+    }
+
+    UInputModifier *Modifier = CreateUInputModifier(ModifierConfig, Action);
+    if (!Modifier)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: AddModifierToAction - failed to create modifier"));
+        return false;
+    }
+
+    Action->Modifiers.Add(Modifier);
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: Added modifier to action '%s'"), *ActionName.ToString());
+    return true;
+}
+
+bool UCPP_EnhancedInputIntegration::RemoveModifierFromAction(const FName &ActionName, EInputModifierType ModifierType)
+{
+    UInputAction *Action = GetInputAction(ActionName);
+    if (!Action)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: RemoveModifierFromAction - action '%s' not found"), *ActionName.ToString());
+        return false;
+    }
+
+    // TODO: Implement proper modifier type detection and removal
+    // For now, this is a stub that logs the request
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: RemoveModifierFromAction - not fully implemented yet"));
+    return false;
+}
+
+bool UCPP_EnhancedInputIntegration::ClearActionModifiers(const FName &ActionName)
+{
+    UInputAction *Action = GetInputAction(ActionName);
+    if (!Action)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: ClearActionModifiers - action '%s' not found"), *ActionName.ToString());
+        return false;
+    }
+
+    Action->Modifiers.Empty();
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: Cleared all modifiers from action '%s'"), *ActionName.ToString());
+    return true;
+}
+
+TArray<FS_InputModifierConfig> UCPP_EnhancedInputIntegration::GetActionModifiers(const FName &ActionName)
+{
+    TArray<FS_InputModifierConfig> Result;
+
+    UInputAction *Action = GetInputAction(ActionName);
+    if (!Action)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: GetActionModifiers - action '%s' not found"), *ActionName.ToString());
+        return Result;
+    }
+
+    // TODO: Convert UInputModifier objects back to config structs
+    // For now, return empty array
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: GetActionModifiers - reverse conversion not fully implemented yet"));
+    return Result;
+}
+
+// ==================== Key Mapping-Level Modifier Functions ====================
+
+bool UCPP_EnhancedInputIntegration::AddModifierToKeyMapping(const FName &ActionName, const FKey &Key, const FS_InputModifierConfig &ModifierConfig)
+{
+    if (!MappingContext)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: AddModifierToKeyMapping - no mapping context"));
+        return false;
+    }
+
+    // TODO: Find the key mapping and add modifier
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: AddModifierToKeyMapping - not fully implemented yet"));
+    return false;
+}
+
+bool UCPP_EnhancedInputIntegration::RemoveModifierFromKeyMapping(const FName &ActionName, const FKey &Key, EInputModifierType ModifierType)
+{
+    if (!MappingContext)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: RemoveModifierFromKeyMapping - no mapping context"));
+        return false;
+    }
+
+    // TODO: Find the key mapping and remove modifier
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: RemoveModifierFromKeyMapping - not fully implemented yet"));
+    return false;
+}
+
+bool UCPP_EnhancedInputIntegration::ClearKeyMappingModifiers(const FName &ActionName, const FKey &Key)
+{
+    if (!MappingContext)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: ClearKeyMappingModifiers - no mapping context"));
+        return false;
+    }
+
+    // TODO: Find the key mapping and clear modifiers
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: ClearKeyMappingModifiers - not fully implemented yet"));
+    return false;
+}
+
+TArray<FS_InputModifierConfig> UCPP_EnhancedInputIntegration::GetKeyMappingModifiers(const FName &ActionName, const FKey &Key)
+{
+    TArray<FS_InputModifierConfig> Result;
+
+    if (!MappingContext)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: GetKeyMappingModifiers - no mapping context"));
+        return Result;
+    }
+
+    // TODO: Find the key mapping and convert modifiers
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: GetKeyMappingModifiers - not fully implemented yet"));
+    return Result;
+}
+
+// ==================== Key Mapping-Level Trigger Functions ====================
+
+bool UCPP_EnhancedInputIntegration::AddTriggerToKeyMapping(const FName &ActionName, const FKey &Key, const FS_InputTriggerConfig &TriggerConfig)
+{
+    if (!MappingContext)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: AddTriggerToKeyMapping - no mapping context"));
+        return false;
+    }
+
+    // TODO: Find the key mapping and add trigger
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: AddTriggerToKeyMapping - not fully implemented yet"));
+    return false;
+}
+
+bool UCPP_EnhancedInputIntegration::RemoveTriggerFromKeyMapping(const FName &ActionName, const FKey &Key, EInputTriggerType TriggerType)
+{
+    if (!MappingContext)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: RemoveTriggerFromKeyMapping - no mapping context"));
+        return false;
+    }
+
+    // TODO: Find the key mapping and remove trigger
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: RemoveTriggerFromKeyMapping - not fully implemented yet"));
+    return false;
+}
+
+bool UCPP_EnhancedInputIntegration::ClearKeyMappingTriggers(const FName &ActionName, const FKey &Key)
+{
+    if (!MappingContext)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: ClearKeyMappingTriggers - no mapping context"));
+        return false;
+    }
+
+    // TODO: Find the key mapping and clear triggers
+    UE_LOG(LogTemp, Warning, TEXT("P_MEIS: ClearKeyMappingTriggers - not fully implemented yet"));
+    return false;
+}
+
+bool UCPP_EnhancedInputIntegration::SetKeyMappingTrigger(const FName &ActionName, const FKey &Key, const FS_InputTriggerConfig &TriggerConfig)
+{
+    // Clear existing triggers and add new one
+    ClearKeyMappingTriggers(ActionName, Key);
+    return AddTriggerToKeyMapping(ActionName, Key, TriggerConfig);
+}
+
+// ==================== Convenience Functions ====================
+
+bool UCPP_EnhancedInputIntegration::SetActionDeadZone(const FName &ActionName, float LowerThreshold, float UpperThreshold)
+{
+    FS_InputModifierConfig Config;
+    Config.ModifierType = EInputModifierType::DeadZone;
+    Config.DeadZoneLower = LowerThreshold;
+    Config.DeadZoneUpper = UpperThreshold;
+    Config.bEnabled = true;
+
+    // Remove existing dead zone first
+    RemoveModifierFromAction(ActionName, EInputModifierType::DeadZone);
+
+    return AddModifierToAction(ActionName, Config);
+}
+
+bool UCPP_EnhancedInputIntegration::SetActionSensitivity(const FName &ActionName, float Sensitivity)
+{
+    return SetActionSensitivityPerAxis(ActionName, FVector(Sensitivity, Sensitivity, Sensitivity));
+}
+
+bool UCPP_EnhancedInputIntegration::SetActionSensitivityPerAxis(const FName &ActionName, FVector Sensitivity)
+{
+    FS_InputModifierConfig Config;
+    Config.ModifierType = EInputModifierType::Scale;
+    Config.ScaleVector = Sensitivity;
+    Config.bEnabled = true;
+
+    // Remove existing scale modifier first
+    RemoveModifierFromAction(ActionName, EInputModifierType::Scale);
+
+    return AddModifierToAction(ActionName, Config);
+}
+
+bool UCPP_EnhancedInputIntegration::SetActionInvertY(const FName &ActionName, bool bInvert)
+{
+    if (bInvert)
+    {
+        FS_InputModifierConfig Config;
+        Config.ModifierType = EInputModifierType::Negate;
+        Config.bNegateX = false;
+        Config.bNegateY = true;
+        Config.bNegateZ = false;
+        Config.bEnabled = true;
+
+        return AddModifierToAction(ActionName, Config);
+    }
+    else
+    {
+        return RemoveModifierFromAction(ActionName, EInputModifierType::Negate);
+    }
+}
+
+bool UCPP_EnhancedInputIntegration::SetKeyHoldTrigger(const FName &ActionName, const FKey &Key, float HoldTime)
+{
+    FS_InputTriggerConfig Config;
+    Config.TriggerType = EInputTriggerType::Hold;
+    Config.HoldTimeThreshold = HoldTime;
+    Config.bEnabled = true;
+
+    return SetKeyMappingTrigger(ActionName, Key, Config);
+}
+
+bool UCPP_EnhancedInputIntegration::SetKeyTapTrigger(const FName &ActionName, const FKey &Key, float MaxTapTime)
+{
+    FS_InputTriggerConfig Config;
+    Config.TriggerType = EInputTriggerType::Tap;
+    Config.TapReleaseTimeThreshold = MaxTapTime;
+    Config.bEnabled = true;
+
+    return SetKeyMappingTrigger(ActionName, Key, Config);
+}
+
+// ==================== Factory Functions ====================
+
+UInputModifier *UCPP_EnhancedInputIntegration::CreateUInputModifier(const FS_InputModifierConfig &ModifierConfig, UObject *Outer)
+{
+    if (!ModifierConfig.bEnabled)
+    {
+        return nullptr;
+    }
+
+    switch (ModifierConfig.ModifierType)
+    {
+    case EInputModifierType::DeadZone:
+    {
+        UInputModifierDeadZone *Modifier = NewObject<UInputModifierDeadZone>(Outer);
+        Modifier->LowerThreshold = ModifierConfig.DeadZoneLower;
+        Modifier->UpperThreshold = ModifierConfig.DeadZoneUpper;
+        // Convert P_MEIS enum to UE5 enum
+        Modifier->Type = static_cast<EDeadZoneType>(static_cast<uint8>(ModifierConfig.DeadZoneType));
+        return Modifier;
+    }
+
+    case EInputModifierType::Scale:
+    {
+        UInputModifierScalar *Modifier = NewObject<UInputModifierScalar>(Outer);
+        Modifier->Scalar = ModifierConfig.ScaleVector;
+        return Modifier;
+    }
+
+    case EInputModifierType::Negate:
+    {
+        UInputModifierNegate *Modifier = NewObject<UInputModifierNegate>(Outer);
+        Modifier->bX = ModifierConfig.bNegateX;
+        Modifier->bY = ModifierConfig.bNegateY;
+        Modifier->bZ = ModifierConfig.bNegateZ;
+        return Modifier;
+    }
+
+    case EInputModifierType::Swizzle:
+    {
+        UInputModifierSwizzleAxis *Modifier = NewObject<UInputModifierSwizzleAxis>(Outer);
+        // Convert P_MEIS enum to UE5 enum
+        Modifier->Order = static_cast<EInputAxisSwizzle>(static_cast<uint8>(ModifierConfig.SwizzleOrder));
+        return Modifier;
+    }
+
+    case EInputModifierType::ResponseCurveExponential:
+    {
+        UInputModifierResponseCurveExponential *Modifier = NewObject<UInputModifierResponseCurveExponential>(Outer);
+        Modifier->CurveExponent = ModifierConfig.CurveExponent;
+        return Modifier;
+    }
+
+    case EInputModifierType::Smooth:
+    {
+        UInputModifierSmooth *Modifier = NewObject<UInputModifierSmooth>(Outer);
+        // TODO: Configure smoothing parameters from config
+        return Modifier;
+    }
+
+    case EInputModifierType::FOVScaling:
+    {
+        UInputModifierFOVScaling *Modifier = NewObject<UInputModifierFOVScaling>(Outer);
+        Modifier->FOVScale = ModifierConfig.FOVScale;
+        return Modifier;
+    }
+
+    case EInputModifierType::ToWorldSpace:
+    {
+        UInputModifierToWorldSpace *Modifier = NewObject<UInputModifierToWorldSpace>(Outer);
+        return Modifier;
+    }
+
+    default:
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: CreateUInputModifier - unsupported modifier type %d"), (int32)ModifierConfig.ModifierType);
+        return nullptr;
+    }
+}
+
+UInputTrigger *UCPP_EnhancedInputIntegration::CreateUInputTrigger(const FS_InputTriggerConfig &TriggerConfig, UObject *Outer, UCPP_EnhancedInputIntegration *Integration)
+{
+    if (!TriggerConfig.bEnabled)
+    {
+        return nullptr;
+    }
+
+    switch (TriggerConfig.TriggerType)
+    {
+    case EInputTriggerType::Down:
+    {
+        UInputTriggerDown *Trigger = NewObject<UInputTriggerDown>(Outer);
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    case EInputTriggerType::Pressed:
+    {
+        UInputTriggerPressed *Trigger = NewObject<UInputTriggerPressed>(Outer);
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    case EInputTriggerType::Released:
+    {
+        UInputTriggerReleased *Trigger = NewObject<UInputTriggerReleased>(Outer);
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    case EInputTriggerType::Hold:
+    {
+        UInputTriggerHold *Trigger = NewObject<UInputTriggerHold>(Outer);
+        Trigger->HoldTimeThreshold = TriggerConfig.HoldTimeThreshold;
+        Trigger->bIsOneShot = TriggerConfig.bIsOneShot;
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    case EInputTriggerType::HoldAndRelease:
+    {
+        UInputTriggerHoldAndRelease *Trigger = NewObject<UInputTriggerHoldAndRelease>(Outer);
+        Trigger->HoldTimeThreshold = TriggerConfig.HoldTimeThreshold;
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    case EInputTriggerType::Tap:
+    {
+        UInputTriggerTap *Trigger = NewObject<UInputTriggerTap>(Outer);
+        Trigger->TapReleaseTimeThreshold = TriggerConfig.TapReleaseTimeThreshold;
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    case EInputTriggerType::Pulse:
+    {
+        UInputTriggerPulse *Trigger = NewObject<UInputTriggerPulse>(Outer);
+        Trigger->bTriggerOnStart = TriggerConfig.bTriggerOnStart;
+        Trigger->Interval = TriggerConfig.PulseInterval;
+        Trigger->TriggerLimit = TriggerConfig.PulseTriggerLimit;
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    case EInputTriggerType::ChordAction:
+    {
+        UInputTriggerChordAction *Trigger = NewObject<UInputTriggerChordAction>(Outer);
+        // Resolve chord action if integration is provided
+        if (Integration && !TriggerConfig.ChordActionName.IsNone())
+        {
+            Trigger->ChordAction = Integration->GetInputAction(TriggerConfig.ChordActionName);
+        }
+        Trigger->ActuationThreshold = TriggerConfig.ActuationThreshold;
+        return Trigger;
+    }
+
+    default:
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: CreateUInputTrigger - unsupported trigger type %d"), (int32)TriggerConfig.TriggerType);
+        return nullptr;
+    }
 }

@@ -942,3 +942,93 @@ void UCPP_BPL_InputBinding::StopWaitingForInputAction(UAsyncAction_WaitForInputA
         AsyncAction->Cancel();
     }
 }
+
+// ==================== Section 0.9: Dynamic Modifiers & Triggers ====================
+
+bool UCPP_BPL_InputBinding::SetActionDeadZone(APlayerController *PlayerController, const FName &ActionName, float LowerThreshold, float UpperThreshold)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: SetActionDeadZone - No integration found for player"));
+        return false;
+    }
+    return Integration->SetActionDeadZone(ActionName, LowerThreshold, UpperThreshold);
+}
+
+bool UCPP_BPL_InputBinding::SetActionSensitivity(APlayerController *PlayerController, const FName &ActionName, float Sensitivity)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: SetActionSensitivity - No integration found for player"));
+        return false;
+    }
+    return Integration->SetActionSensitivity(ActionName, Sensitivity);
+}
+
+bool UCPP_BPL_InputBinding::SetActionSensitivityPerAxis(APlayerController *PlayerController, const FName &ActionName, FVector Sensitivity)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: SetActionSensitivityPerAxis - No integration found for player"));
+        return false;
+    }
+    return Integration->SetActionSensitivityPerAxis(ActionName, Sensitivity);
+}
+
+bool UCPP_BPL_InputBinding::SetActionInvertY(APlayerController *PlayerController, const FName &ActionName, bool bInvert)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: SetActionInvertY - No integration found for player"));
+        return false;
+    }
+    return Integration->SetActionInvertY(ActionName, bInvert);
+}
+
+bool UCPP_BPL_InputBinding::SetKeyHoldTrigger(APlayerController *PlayerController, const FName &ActionName, const FKey &Key, float HoldTime)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: SetKeyHoldTrigger - No integration found for player"));
+        return false;
+    }
+    return Integration->SetKeyHoldTrigger(ActionName, Key, HoldTime);
+}
+
+bool UCPP_BPL_InputBinding::SetKeyTapTrigger(APlayerController *PlayerController, const FName &ActionName, const FKey &Key, float MaxTapTime)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: SetKeyTapTrigger - No integration found for player"));
+        return false;
+    }
+    return Integration->SetKeyTapTrigger(ActionName, Key, MaxTapTime);
+}
+
+bool UCPP_BPL_InputBinding::ClearKeyTriggers(APlayerController *PlayerController, const FName &ActionName, const FKey &Key)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: ClearKeyTriggers - No integration found for player"));
+        return false;
+    }
+    return Integration->ClearKeyMappingTriggers(ActionName, Key);
+}
+
+bool UCPP_BPL_InputBinding::ClearActionModifiers(APlayerController *PlayerController, const FName &ActionName)
+{
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (!Integration)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS BPL: ClearActionModifiers - No integration found for player"));
+        return false;
+    }
+    return Integration->ClearActionModifiers(ActionName);
+}

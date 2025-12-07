@@ -3,8 +3,9 @@
  * @Description: Enhanced Input Integration - Bridges P_MEIS with UE5 Enhanced Input System
  *               Supports dynamic creation of Input Actions, Mapping Contexts, and key bindings at runtime
  *               Includes Blueprint-friendly event dispatchers for action binding
+ *               Section 0.9: Added dynamic modifier and trigger management
  * @Date: 06/12/2025
- * @Version: 2.0 - Added global event dispatchers (Approach A) and async node support (Approach C)
+ * @Version: 3.0 - Added dynamic modifier/trigger management (Section 0.9)
  */
 
 #pragma once
@@ -15,12 +16,16 @@
 #include "InputActionValue.h"
 #include "InputBinding/FS_InputProfile.h"
 #include "InputBinding/FS_InputActionBinding.h"
+#include "InputBinding/FS_InputModifier.h"
+#include "InputBinding/FS_InputTriggerConfig.h"
 #include "CPP_EnhancedInputIntegration.generated.h"
 
 class APlayerController;
 class UEnhancedInputComponent;
 class UInputMappingContext;
 class UInputAction;
+class UInputModifier;
+class UInputTrigger;
 class UInputModifierDeadZone;
 class UInputModifierNegate;
 class UInputModifierScalar;
@@ -228,6 +233,225 @@ public:
     UFUNCTION(BlueprintPure, Category = "P_MEIS|Action Events")
     bool HasPendingActions() const { return PendingBindActions.Num() > 0; }
 
+    // ==================== Section 0.9: Dynamic Input Modifiers ====================
+
+    /**
+     * Create a new Input Action with modifiers and triggers pre-configured
+     * @param ActionName Unique name for the action
+     * @param ValueType The type of value this action produces (Bool, Axis1D, Axis2D, Axis3D)
+     * @param Modifiers Array of modifier configurations to apply to the action
+     * @param Triggers Array of trigger configurations (applied to default mappings)
+     * @return The created Input Action, or nullptr on failure
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Dynamic Actions")
+    UInputAction *CreateDynamicInputActionWithModifiers(
+        const FName &ActionName,
+        EInputActionValueType ValueType,
+        const TArray<FS_InputModifierConfig> &Modifiers,
+        const TArray<FS_InputTriggerConfig> &Triggers);
+
+    // ==================== Action-Level Modifiers ====================
+    // These modifiers apply to ALL key mappings for the action
+
+    /**
+     * Add a modifier to an Input Action (applies to all key mappings)
+     * @param ActionName Name of the action to modify
+     * @param ModifierConfig Configuration for the modifier to add
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    bool AddModifierToAction(const FName &ActionName, const FS_InputModifierConfig &ModifierConfig);
+
+    /**
+     * Remove a modifier type from an Input Action
+     * @param ActionName Name of the action
+     * @param ModifierType Type of modifier to remove
+     * @return True if a modifier was removed
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    bool RemoveModifierFromAction(const FName &ActionName, EInputModifierType ModifierType);
+
+    /**
+     * Clear all modifiers from an Input Action
+     * @param ActionName Name of the action
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    bool ClearActionModifiers(const FName &ActionName);
+
+    /**
+     * Get all modifiers currently on an Input Action
+     * @param ActionName Name of the action
+     * @return Array of modifier configurations
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    TArray<FS_InputModifierConfig> GetActionModifiers(const FName &ActionName);
+
+    // ==================== Key Mapping-Level Modifiers ====================
+    // These modifiers apply only to a specific key mapping
+
+    /**
+     * Add a modifier to a specific key mapping (overrides action-level for this key)
+     * @param ActionName Name of the action
+     * @param Key The key to add the modifier to
+     * @param ModifierConfig Configuration for the modifier to add
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    bool AddModifierToKeyMapping(const FName &ActionName, const FKey &Key, const FS_InputModifierConfig &ModifierConfig);
+
+    /**
+     * Remove a modifier type from a specific key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to modify
+     * @param ModifierType Type of modifier to remove
+     * @return True if a modifier was removed
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    bool RemoveModifierFromKeyMapping(const FName &ActionName, const FKey &Key, EInputModifierType ModifierType);
+
+    /**
+     * Clear all modifiers from a specific key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to clear modifiers from
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    bool ClearKeyMappingModifiers(const FName &ActionName, const FKey &Key);
+
+    /**
+     * Get all modifiers on a specific key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to query
+     * @return Array of modifier configurations
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers")
+    TArray<FS_InputModifierConfig> GetKeyMappingModifiers(const FName &ActionName, const FKey &Key);
+
+    // ==================== Key Mapping-Level Triggers ====================
+    // Triggers determine WHEN an action fires
+
+    /**
+     * Add a trigger to a specific key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to add the trigger to
+     * @param TriggerConfig Configuration for the trigger to add
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Triggers")
+    bool AddTriggerToKeyMapping(const FName &ActionName, const FKey &Key, const FS_InputTriggerConfig &TriggerConfig);
+
+    /**
+     * Remove a trigger type from a specific key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to modify
+     * @param TriggerType Type of trigger to remove
+     * @return True if a trigger was removed
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Triggers")
+    bool RemoveTriggerFromKeyMapping(const FName &ActionName, const FKey &Key, EInputTriggerType TriggerType);
+
+    /**
+     * Clear all triggers from a specific key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to clear triggers from
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Triggers")
+    bool ClearKeyMappingTriggers(const FName &ActionName, const FKey &Key);
+
+    /**
+     * Set a single trigger on a key mapping (clears existing triggers first)
+     * @param ActionName Name of the action
+     * @param Key The key to set the trigger on
+     * @param TriggerConfig Configuration for the trigger
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Triggers")
+    bool SetKeyMappingTrigger(const FName &ActionName, const FKey &Key, const FS_InputTriggerConfig &TriggerConfig);
+
+    // ==================== Convenience Functions ====================
+    // Quick methods for common modifier/trigger operations
+
+    /**
+     * Set dead zone for an action (all axes)
+     * @param ActionName Name of the action
+     * @param LowerThreshold Input below this is ignored (0.0-1.0)
+     * @param UpperThreshold Input above this is clamped to 1.0
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers|Quick")
+    bool SetActionDeadZone(const FName &ActionName, float LowerThreshold, float UpperThreshold = 1.0f);
+
+    /**
+     * Set sensitivity (scale) for an action (uniform across all axes)
+     * @param ActionName Name of the action
+     * @param Sensitivity Multiplier for input values
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers|Quick")
+    bool SetActionSensitivity(const FName &ActionName, float Sensitivity);
+
+    /**
+     * Set sensitivity (scale) per axis for an action
+     * @param ActionName Name of the action
+     * @param Sensitivity Multiplier per axis (X, Y, Z)
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers|Quick")
+    bool SetActionSensitivityPerAxis(const FName &ActionName, FVector Sensitivity);
+
+    /**
+     * Set invert Y axis for an action (common for "Invert Look" option)
+     * @param ActionName Name of the action
+     * @param bInvert Whether to invert the Y axis
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Modifiers|Quick")
+    bool SetActionInvertY(const FName &ActionName, bool bInvert);
+
+    /**
+     * Set a hold trigger on a key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to modify
+     * @param HoldTime How long to hold before triggering (seconds)
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Triggers|Quick")
+    bool SetKeyHoldTrigger(const FName &ActionName, const FKey &Key, float HoldTime);
+
+    /**
+     * Set a tap trigger on a key mapping
+     * @param ActionName Name of the action
+     * @param Key The key to modify
+     * @param MaxTapTime Maximum time between press and release for tap (seconds)
+     * @return True if successful
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Triggers|Quick")
+    bool SetKeyTapTrigger(const FName &ActionName, const FKey &Key, float MaxTapTime);
+
+    // ==================== Modifier/Trigger Factory Functions ====================
+    // These create UE5 objects from P_MEIS config structs
+
+    /**
+     * Create a UInputModifier from a configuration struct
+     * @param ModifierConfig The configuration to use
+     * @param Outer The outer object for the created modifier (usually the action or mapping context)
+     * @return The created UInputModifier, or nullptr if invalid config
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Factory")
+    static UInputModifier *CreateUInputModifier(const FS_InputModifierConfig &ModifierConfig, UObject *Outer);
+
+    /**
+     * Create a UInputTrigger from a configuration struct
+     * @param TriggerConfig The configuration to use
+     * @param Outer The outer object for the created trigger
+     * @param Integration Integration instance for resolving chord action references (optional)
+     * @return The created UInputTrigger, or nullptr if invalid config
+     */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Factory")
+    static UInputTrigger *CreateUInputTrigger(const FS_InputTriggerConfig &TriggerConfig, UObject *Outer, UCPP_EnhancedInputIntegration *Integration = nullptr);
+
 private:
     UPROPERTY()
     APlayerController *PlayerController;
@@ -259,6 +483,18 @@ private:
 
     /** Internal helper to create modifiers for axis bindings */
     void ApplyAxisModifiers(UInputAction *Action, const FS_InputAxisBinding &AxisBinding);
+
+    /** Find a key mapping in the mapping context for a given action and key */
+    FEnhancedActionKeyMapping *FindKeyMapping(const FName &ActionName, const FKey &Key);
+
+    /** Convert P_MEIS DeadZoneType to UE5 EDeadZoneType */
+    static EDeadZoneType ConvertDeadZoneType(EP_MEIS_DeadZoneType Type);
+
+    /** Convert P_MEIS SwizzleOrder to UE5 EInputAxisSwizzle */
+    static EInputAxisSwizzle ConvertSwizzleOrder(EP_MEIS_SwizzleOrder Order);
+
+    /** Convert P_MEIS SmoothingMethod to UE5 ENormalizeInputSmoothingType */
+    static ENormalizeInputSmoothingType ConvertSmoothingMethod(EP_MEIS_SmoothingMethod Method);
 
     // ==================== Internal Event Handlers ====================
     // These are bound to Enhanced Input and route events to dispatchers
