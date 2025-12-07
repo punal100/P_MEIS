@@ -1,6 +1,6 @@
 ﻿# P_MEIS Base Implementation
 
-Core implementation code for the **Modular Enhanced Input System (P_MEIS)** - A Modular-style dynamic input binding system for Unreal Engine 5.
+Core implementation code for the **Modular Enhanced Input System (P_MEIS)** - A Modular-style dynamic input binding system for Unreal Engine 5 with **per-player architecture** for split-screen multiplayer support.
 
 ## 📁 Folder Structure
 
@@ -10,12 +10,13 @@ Base/
 │   ├── FS_InputActionBinding.h     # Discrete action key mappings
 │   ├── FS_InputAxisBinding.h       # Analog axis input mappings
 │   ├── FS_InputModifier.h          # Input modifiers (curves, dead zones, etc.)
-│   └── FS_InputProfile.h           # Complete profile snapshots
+│   ├── FS_InputProfile.h           # Complete profile snapshots
+│   └── FS_PlayerInputData.h        # Per-player runtime data (Profile + Integration)
 ├── Manager/               # Core management system
-│   ├── CPP_InputBindingManager.h   # Engine subsystem (singleton)
-│   ├── CPP_InputBindingManager.cpp # Full implementation
+│   ├── CPP_InputBindingManager.h   # Engine subsystem (singleton) with per-player TMap
+│   ├── CPP_InputBindingManager.cpp # Full implementation + ALL helper functions
 │   ├── CPP_BPL_InputBinding.h      # Blueprint Function Library
-│   └── CPP_BPL_InputBinding.cpp    # BPL implementation
+│   └── CPP_BPL_InputBinding.cpp    # BPL implementation + ALL wrapper functions
 ├── Storage/               # Profile persistence layer
 │   ├── CPP_InputProfileStorage.h   # File I/O and JSON serialization
 │   └── CPP_InputProfileStorage.cpp # Storage implementation
@@ -23,14 +24,31 @@ Base/
 │   ├── CPP_InputValidator.h        # Validation utilities
 │   └── CPP_InputValidator.cpp      # Validator implementation
 ├── Integration/           # Enhanced Input System bridge
-│   ├── CPP_EnhancedInputIntegration.h   # Integration wrapper
-│   └── CPP_EnhancedInputIntegration.cpp # Integration implementation
+│   ├── CPP_EnhancedInputIntegration.h   # Integration wrapper (per-player) + Global Event Dispatchers
+│   ├── CPP_EnhancedInputIntegration.cpp # Integration implementation
+│   ├── CPP_AsyncAction_WaitForInputAction.h   # Async Blueprint node (Approach C)
+│   └── CPP_AsyncAction_WaitForInputAction.cpp # Async action implementation
 └── README.md              # This file
 ```
 
 ## 🏗️ Architecture Overview
 
-### **Phase 1: Core Architecture** ✅ (Complete)
+### **Per-Player Architecture** ✅ (Core Principle)
+
+Each `APlayerController` has their OWN:
+
+- **ActiveProfile** (`FS_InputProfile`) - This player's key bindings
+- **Integration** (`UCPP_EnhancedInputIntegration*`) - This player's Enhanced Input bridge
+- **LoadedTemplateName** - Which template they loaded from
+
+**Key Data Structure:**
+
+```cpp
+TMap<APlayerController*, FS_PlayerInputData> PlayerDataMap;  // Per-player runtime data
+TMap<FName, FS_InputProfile> ProfileTemplates;               // Global template library (disk)
+```
+
+### **Phase 0-1: Core Architecture** ✅ (Complete)
 
 #### Data Structures (InputBinding/)
 
@@ -38,23 +56,26 @@ Base/
 - **FS_InputAxisBinding** - Analog axis mappings with dead zone, sensitivity, invert flags
 - **FS_InputModifier** - Input modifier types: DeadZone, ResponseCurve, Negate, Swizzle, Clamp, Scale
 - **FS_InputProfile** - Complete profile snapshot containing all bindings and metadata
+- **FS_PlayerInputData** - Per-player runtime data (Profile + Integration reference)
 
 #### Manager System (Manager/)
 
 - **UCPP_InputBindingManager** - Engine subsystem providing:
-  - Profile management (Load, Save, Create, Delete, Rename, Duplicate, Reset)
-  - Action/Axis binding operations
+  - **Per-Player TMap** for split-screen support
+  - Profile template management (Load, Save, Create, Delete)
+  - Per-player action/axis binding operations
+  - Comprehensive helper API (~40+ functions)
   - Validation and conflict detection
   - Event delegates for binding changes
-  - Blueprint-callable functions for full BP access
 
 #### Public API (Manager/)
 
 - **UCPP_BPL_InputBinding** - Blueprint Function Library exposing:
-  - 30+ Blueprint-callable functions
-  - All manager operations accessible to Blueprints
-  - Profile management and I/O operations
-  - Validation and conflict detection
+  - 50+ Blueprint-callable functions
+  - ALL manager operations accessible to Blueprints
+  - Per-player profile management
+  - Key category utilities (Keyboard, Gamepad, Mouse)
+  - Full validation and conflict detection
 
 ### **Phase 2: Data Persistence** ✅ (Complete)
 
@@ -71,39 +92,94 @@ Base/
 
 ### UCPP_InputBindingManager
 
-**Type:** Engine Subsystem (Singleton)
+**Type:** Engine Subsystem (Singleton) with Per-Player TMap
 
-**Public Functions:**
+**Core Data:**
 
 ```cpp
-// Profile Operations
-bool LoadProfile(const FName& ProfileName);
-bool SaveProfile(const FName& ProfileName);
-bool CreateProfile(const FName& ProfileName);
-bool DeleteProfile(const FName& ProfileName);
-bool RenameProfile(const FName& OldName, const FName& NewName);
-bool DuplicateProfile(const FName& Source, const FName& NewName);
-bool ResetToDefaults();
-void GetAvailableProfiles(TArray<FName>& OutProfiles);
+// Global template library (saved to disk)
+TMap<FName, FS_InputProfile> ProfileTemplates;
 
-// Action Binding Operations
-bool SetActionBinding(const FName& ActionName, const FS_InputActionBinding& Binding);
-bool RemoveActionBinding(const FName& ActionName);
-bool GetActionBinding(const FName& ActionName, FS_InputActionBinding& OutBinding);
-void GetActionBindings(TArray<FS_InputActionBinding>& OutBindings);
-bool ClearActionBindings();
+// Per-player runtime data
+TMap<APlayerController*, FS_PlayerInputData> PlayerDataMap;
+```
 
-// Axis Binding Operations
-bool SetAxisBinding(const FName& AxisName, const FS_InputAxisBinding& Binding);
-bool RemoveAxisBinding(const FName& AxisName);
-bool GetAxisBinding(const FName& AxisName, FS_InputAxisBinding& OutBinding);
-void GetAxisBindings(TArray<FS_InputAxisBinding>& OutBindings);
-bool ClearAxisBindings();
+**Player Management Functions:**
 
-// Validation
+```cpp
+UCPP_EnhancedInputIntegration* RegisterPlayer(APlayerController* PC);
+void UnregisterPlayer(APlayerController* PC);
+UCPP_EnhancedInputIntegration* GetIntegrationForPlayer(APlayerController* PC);
+FS_InputProfile& GetProfileForPlayer(APlayerController* PC);
+bool IsPlayerRegistered(APlayerController* PC) const;
+int32 GetRegisteredPlayerCount() const;
+TArray<APlayerController*> GetAllRegisteredPlayers();
+```
+
+**Template Management Functions:**
+
+```cpp
+bool LoadProfileTemplate(const FName& TemplateName);
+bool SaveProfileTemplate(const FName& TemplateName, const FS_InputProfile& Profile);
+bool CreateProfileTemplate(const FName& TemplateName);
+bool DeleteProfileTemplate(const FName& TemplateName);
+void GetAvailableTemplates(TArray<FName>& OutTemplates);
+bool DoesTemplateExist(const FName& TemplateName) const;
+int32 GetTemplateCount() const;
+```
+
+**Per-Player Profile Operations:**
+
+```cpp
+bool ApplyTemplateToPlayer(APlayerController* PC, const FName& TemplateName);
+bool SavePlayerProfileAsTemplate(APlayerController* PC, const FName& TemplateName);
+FName GetPlayerLoadedTemplateName(APlayerController* PC) const;
+bool HasPlayerModifiedProfile(APlayerController* PC) const;
+```
+
+**Action Binding Functions:**
+
+```cpp
+// Getters
+bool GetPlayerActionBinding(APlayerController* PC, const FName& ActionName, FS_InputActionBinding& OutBinding);
+TArray<FS_InputActionBinding> GetPlayerActionBindings(APlayerController* PC);
+TArray<FKey> GetKeysForAction(APlayerController* PC, const FName& ActionName);
+FKey GetPrimaryKeyForAction(APlayerController* PC, const FName& ActionName);
+TArray<FName> GetActionsForKey(APlayerController* PC, const FKey& Key);
+bool DoesActionExist(APlayerController* PC, const FName& ActionName) const;
+int32 GetKeyCountForAction(APlayerController* PC, const FName& ActionName) const;
+
+// Setters
+bool SetPlayerActionBinding(APlayerController* PC, const FName& ActionName, const FS_InputActionBinding& Binding);
+bool SetPrimaryKeyForAction(APlayerController* PC, const FName& ActionName, const FKey& Key);
+bool AddKeyToAction(APlayerController* PC, const FName& ActionName, const FKey& Key);
+bool RemoveKeyFromAction(APlayerController* PC, const FName& ActionName, const FKey& Key);
+bool ClearActionKeys(APlayerController* PC, const FName& ActionName);
+bool RemovePlayerActionBinding(APlayerController* PC, const FName& ActionName);
+bool SwapActionBindings(APlayerController* PC, const FName& ActionA, const FName& ActionB);
+```
+
+**Axis Binding Functions:**
+
+```cpp
+// Getters
+bool GetPlayerAxisBinding(APlayerController* PC, const FName& AxisName, FS_InputAxisBinding& OutBinding);
+TArray<FS_InputAxisBinding> GetPlayerAxisBindings(APlayerController* PC);
+float GetAxisSensitivity(APlayerController* PC, const FName& AxisName) const;
+float GetAxisDeadZone(APlayerController* PC, const FName& AxisName) const;
+
+// Setters
+bool SetPlayerAxisBinding(APlayerController* PC, const FName& AxisName, const FS_InputAxisBinding& Binding);
+bool SetAxisSensitivity(APlayerController* PC, const FName& AxisName, float Sensitivity);
+bool SetAxisDeadZone(APlayerController* PC, const FName& AxisName, float DeadZone);
+```
+
+**Validation Functions:**
+
+```cpp
 bool ValidateBinding(const FS_InputActionBinding& Binding, FString& OutErrorMessage);
-void GetConflictingBindings(TArray<TPair<FName, FName>>& OutConflicts);
-bool IsKeyBound(const FKey& Key);
+void GetConflictingBindingsForPlayer(APlayerController* PC, TArray<TPair<FName, FName>>& OutConflicts);
+bool IsKeyBoundForPlayer(APlayerController* PC, const FKey& Key);
 ```
 
 **Delegates:**
@@ -141,6 +217,100 @@ FString GetProfileDirectory();
 FString GetProfileFilePath(const FName& ProfileName);
 ```
 
+### UCPP_BPL_InputBinding
+
+**Type:** Blueprint Function Library (Static)
+
+All functions route through Manager - NO cached/static state.
+
+**Player Management:**
+
+```cpp
+static UCPP_EnhancedInputIntegration* InitializeEnhancedInputIntegration(APlayerController* PC);
+static UCPP_EnhancedInputIntegration* GetIntegrationForPlayer(APlayerController* PC);
+static void UnregisterPlayer(APlayerController* PC);
+static bool IsPlayerRegistered(APlayerController* PC);
+static int32 GetRegisteredPlayerCount();
+```
+
+**Dynamic Input Actions:**
+
+```cpp
+static UInputAction* CreateDynamicInputAction(APlayerController* PC, const FName& ActionName, bool bIsAxis);
+static UInputAction* GetDynamicInputAction(APlayerController* PC, const FName& ActionName);
+static bool MapKeyToDynamicAction(APlayerController* PC, const FName& ActionName, const FKey& Key);
+static bool MapKeyStringToDynamicAction(APlayerController* PC, const FName& ActionName, const FString& KeyString);
+static bool DoesInputActionExist(APlayerController* PC, const FString& ActionName);
+static UInputMappingContext* GetInputMappingContext(APlayerController* PC);
+```
+
+**Profile Operations (Per-Player):**
+
+```cpp
+static bool LoadProfileForPlayer(APlayerController* PC, const FString& TemplateName);
+static bool SaveProfileForPlayer(APlayerController* PC, const FString& TemplateName);
+static FS_InputProfile GetProfileForPlayer(APlayerController* PC);
+static bool ApplyTemplateToPlayer(APlayerController* PC, const FString& TemplateName);
+static FString GetPlayerLoadedTemplateName(APlayerController* PC);
+static bool HasPlayerModifiedProfile(APlayerController* PC);
+```
+
+**Template Management (Global):**
+
+```cpp
+static TArray<FString> GetAvailableProfileTemplates();
+static bool CreateProfileTemplate(const FString& TemplateName);
+static bool DeleteProfileTemplate(const FString& TemplateName);
+static bool DoesTemplateExist(const FString& TemplateName);
+static int32 GetTemplateCount();
+```
+
+**Action Binding Operations:**
+
+```cpp
+// Getters
+static TArray<FKey> GetKeysForAction(APlayerController* PC, const FString& ActionName);
+static FKey GetPrimaryKeyForAction(APlayerController* PC, const FString& ActionName);
+static TArray<FString> GetActionsForKey(APlayerController* PC, const FKey& Key);
+static bool DoesActionExist(APlayerController* PC, const FString& ActionName);
+
+// Setters
+static bool SetPrimaryKeyForAction(APlayerController* PC, const FString& ActionName, const FKey& Key);
+static bool AddKeyToAction(APlayerController* PC, const FString& ActionName, const FKey& Key);
+static bool RemoveKeyFromAction(APlayerController* PC, const FString& ActionName, const FKey& Key);
+static bool ClearActionKeys(APlayerController* PC, const FString& ActionName);
+static bool SwapActionBindings(APlayerController* PC, const FString& ActionA, const FString& ActionB);
+```
+
+**Axis Binding Operations:**
+
+```cpp
+static float GetAxisSensitivity(APlayerController* PC, const FString& AxisName);
+static bool SetAxisSensitivity(APlayerController* PC, const FString& AxisName, float Sensitivity);
+static float GetAxisDeadZone(APlayerController* PC, const FString& AxisName);
+static bool SetAxisDeadZone(APlayerController* PC, const FString& AxisName, float DeadZone);
+```
+
+**Validation & Conflicts:**
+
+```cpp
+static TArray<FName> GetConflictingBindings(APlayerController* PC);
+static bool IsKeyBoundForPlayer(APlayerController* PC, const FKey& Key);
+```
+
+**Key Utilities (Static - No PC needed):**
+
+```cpp
+static FKey StringToKey(const FString& KeyString);
+static FString KeyToString(const FKey& Key);
+static FString KeyToDisplayString(const FKey& Key);
+static bool IsValidKeyString(const FString& KeyString);
+static TArray<FString> GetAllKeyNames();
+static TArray<FKey> GetAllKeyboardKeys();
+static TArray<FKey> GetAllGamepadKeys();
+static TArray<FKey> GetAllMouseKeys();
+```
+
 ### UCPP_InputValidator
 
 **Type:** Static Utility Class
@@ -159,18 +329,58 @@ bool DetectConflicts(const TArray<FS_InputActionBinding>& Bindings, TArray<TPair
 
 ### UCPP_EnhancedInputIntegration
 
-**Type:** UObject Bridge
+**Type:** UObject Bridge - **100% Dynamic Input System**
 
-**Functions:**
+**Core Functions:**
 
 ```cpp
+// Profile Application
 bool ApplyProfile(const FS_InputProfile& Profile);
 bool ApplyActionBinding(const FS_InputActionBinding& ActionBinding);
 bool ApplyAxisBinding(const FS_InputAxisBinding& AxisBinding);
+
+// Player Controller
 void SetPlayerController(APlayerController* InPlayerController);
+APlayerController* GetPlayerController() const;
+
+// Dynamic Input Action Creation (NEW!)
+UInputAction* CreateInputAction(const FName& ActionName, EInputActionValueType ValueType = EInputActionValueType::Boolean);
+UInputAction* GetInputAction(const FName& ActionName) const;
+bool HasInputAction(const FName& ActionName) const;
+void GetAllInputActions(TArray<UInputAction*>& OutActions) const;
+
+// Key Mapping (NEW!)
+bool MapKeyToAction(const FName& ActionName, const FKey& Key);
+bool UnmapKeyFromAction(const FName& ActionName, const FKey& Key);
+bool UnmapAllKeysFromAction(const FName& ActionName);
+void ClearAllMappings();
+
+// String to FKey Conversion (NEW!)
+static FKey StringToKey(const FString& KeyString);
+static FString KeyToString(const FKey& Key);
+static bool IsValidKeyString(const FString& KeyString);
+static void GetAllKeyNames(TArray<FString>& OutKeyNames);
+
+// Mapping Context
+UInputMappingContext* GetMappingContext() const;
+bool RefreshMappingContext();
+```
+
+**Events:**
+
+```cpp
+FOnDynamicInputAction OnDynamicInputAction; // Broadcast when any dynamic action triggers
 ```
 
 ## 📊 Data Structures
+
+### FS_PlayerInputData
+
+Per-player runtime data (stored in Manager's PlayerDataMap):
+
+- `FS_InputProfile ActiveProfile` - This player's current key bindings (their OWN copy)
+- `UCPP_EnhancedInputIntegration* Integration` - This player's Enhanced Input bridge
+- `FName LoadedTemplateName` - Which template they loaded from (for save/reload)
 
 ### FS_InputProfile
 
@@ -212,25 +422,73 @@ Analog axis mapping with sensitivity:
 
 ## 🎮 Usage from Blueprints
 
-Access the system via `UCPP_BPL_InputBinding` Blueprint Function Library:
+Access the system via `UCPP_BPL_InputBinding` Blueprint Function Library.
+
+**IMPORTANT:** All operations require a `PlayerController` reference - there's no global state!
+
+### Basic Setup Flow:
 
 ```cpp
-// Load a profile
-UCPP_BPL_InputBinding::LoadProfile("MyProfile");
+// 1. Get Player Controller reference (from Character BeginPlay)
+APlayerController* MyPC = GetController();
 
-// Get all action bindings
-TArray<FS_InputActionBinding> Bindings;
-UCPP_BPL_InputBinding::GetActionBindings(Bindings);
+// 2. Initialize player (creates Integration + empty Profile)
+UCPP_EnhancedInputIntegration* Integration = UCPP_BPL_InputBinding::InitializeEnhancedInputIntegration(MyPC);
+
+// 3. Load a template profile for this player
+UCPP_BPL_InputBinding::LoadProfileForPlayer(MyPC, "Default");
+
+// 4. Create dynamic input actions
+UInputAction* JumpAction = UCPP_BPL_InputBinding::CreateDynamicInputAction(MyPC, "IA_Jump", false);
+
+// 5. Map keys to actions
+UCPP_BPL_InputBinding::MapKeyStringToDynamicAction(MyPC, "IA_Jump", "SpaceBar");
+
+// 6. Save player's profile as a template (optional)
+UCPP_BPL_InputBinding::SaveProfileForPlayer(MyPC, "Player1_Custom");
+```
+
+### Rebinding Keys at Runtime:
+
+```cpp
+// Get current keys for action
+TArray<FKey> JumpKeys = UCPP_BPL_InputBinding::GetKeysForAction(MyPC, "IA_Jump");
+
+// Set new primary key
+UCPP_BPL_InputBinding::SetPrimaryKeyForAction(MyPC, "IA_Jump", EKeys::E);
+
+// Add secondary key
+UCPP_BPL_InputBinding::AddKeyToAction(MyPC, "IA_Jump", EKeys::Gamepad_FaceButton_Bottom);
+
+// Swap two action bindings
+UCPP_BPL_InputBinding::SwapActionBindings(MyPC, "IA_Jump", "IA_Interact");
+```
+
+### Axis Binding Operations:
+
+```cpp
+// Get/Set sensitivity
+float Sensitivity = UCPP_BPL_InputBinding::GetAxisSensitivity(MyPC, "IA_Look");
+UCPP_BPL_InputBinding::SetAxisSensitivity(MyPC, "IA_Look", 1.5f);
+
+// Get/Set dead zone
+float DeadZone = UCPP_BPL_InputBinding::GetAxisDeadZone(MyPC, "IA_Move");
+UCPP_BPL_InputBinding::SetAxisDeadZone(MyPC, "IA_Move", 0.15f);
+```
+
+### Utility Functions:
+
+```cpp
+// Get all keys by category (for UI dropdowns)
+TArray<FKey> KeyboardKeys = UCPP_BPL_InputBinding::GetAllKeyboardKeys();
+TArray<FKey> GamepadKeys = UCPP_BPL_InputBinding::GetAllGamepadKeys();
+TArray<FKey> MouseKeys = UCPP_BPL_InputBinding::GetAllMouseKeys();
+
+// Convert key to display string
+FString DisplayName = UCPP_BPL_InputBinding::KeyToDisplayString(EKeys::SpaceBar); // "Space Bar"
 
 // Check for conflicts
-TArray<TPair<FName, FName>> Conflicts;
-UCPP_BPL_InputBinding::GetConflictingBindings(Conflicts);
-
-// Save current profile
-UCPP_BPL_InputBinding::SaveProfile("MyProfile");
-
-// Export profile to file
-UCPP_BPL_InputBinding::ExportProfile("MyProfile", "/Path/To/Export.json");
+TArray<FName> Conflicts = UCPP_BPL_InputBinding::GetConflictingBindings(MyPC);
 ```
 
 ## 💾 Profile Storage Format
@@ -290,6 +548,154 @@ The `UCPP_EnhancedInputIntegration` class bridges P_MEIS with UE5's Enhanced Inp
 3. **Player Controller Integration** - Per-player input configuration
 4. **Modifier Application** - Enhanced Input modifiers applied automatically
 
+## 🎯 Blueprint Action Binding (Section 0.8)
+
+P_MEIS provides two approaches for binding Blueprint events to dynamically created Input Actions:
+
+### Approach A: Global Event Dispatchers
+
+Use global dispatchers on the Integration class - ideal for simple games or centralized input handling.
+
+**Events Available on Integration:**
+
+- `OnActionTriggered` - Fires when action is TRIGGERED (main event)
+- `OnActionStarted` - Fires when action is STARTED (initial press)
+- `OnActionOngoing` - Fires when action is ONGOING (held down)
+- `OnActionCompleted` - Fires when action is COMPLETED (released after trigger)
+- `OnActionCanceled` - Fires when action is CANCELED (released before trigger)
+
+**Blueprint Usage (Approach A):**
+
+```
+Event BeginPlay
+    │
+    ├─→ Initialize Enhanced Input Integration (MyPC) → Store as "MyIntegration"
+    │
+    ├─→ Create Dynamic Input Action (MyPC, "IA_Jump", false)
+    │
+    ├─→ Map Key String To Dynamic Action (MyPC, "IA_Jump", "SpaceBar")
+    │
+    └─→ MyIntegration → Bind Event to OnActionTriggered
+                              │
+                              └─→ Custom Event: OnAnyAction(ActionName, Value)
+                                        │
+                                        └─→ Switch on ActionName
+                                                ├── "IA_Jump" → Jump()
+                                                ├── "IA_Fire" → Fire()
+                                                └── "IA_Move" → Move(Value)
+```
+
+**C++ Usage (Approach A):**
+
+```cpp
+// Get integration and bind to global dispatcher
+UCPP_EnhancedInputIntegration* Integration = UCPP_BPL_InputBinding::GetIntegrationForPlayer(MyPC);
+if (Integration)
+{
+    Integration->OnActionTriggered.AddDynamic(this, &AMyCharacter::HandleAnyActionTriggered);
+}
+
+// Handler function - filter by action name
+void AMyCharacter::HandleAnyActionTriggered(FName ActionName, FInputActionValue Value)
+{
+    if (ActionName == "IA_Jump")
+    {
+        Jump();
+    }
+    else if (ActionName == "IA_Fire")
+    {
+        Fire();
+    }
+}
+```
+
+### Approach C: Async Action Nodes (Wait For Input Action)
+
+Use async Blueprint nodes for per-action binding - ideal for complex games or per-widget/per-actor input handling.
+
+**Blueprint Node: "Wait For Input Action"**
+
+- Creates a node with multiple output execution pins
+- Filters by specific ActionName automatically
+- Optional `bOnlyTriggerOnce` parameter
+- Has `OnStopped` output pin that fires when the node is canceled
+
+**Output Pins:**
+
+| Pin          | Description                                                                  |
+| ------------ | ---------------------------------------------------------------------------- |
+| On Triggered | Fires when action is TRIGGERED (main event)                                  |
+| On Started   | Fires when action is STARTED (initial press)                                 |
+| On Ongoing   | Fires when action is ONGOING (held down)                                     |
+| On Completed | Fires when action is COMPLETED (released after trigger)                      |
+| On Canceled  | Fires when action is CANCELED (released before trigger)                      |
+| On Stopped   | Fires when async node is STOPPED via Cancel() or StopWaitingForInputAction() |
+
+**Blueprint Usage (Approach C):**
+
+```
+Event BeginPlay
+    │
+    ├─→ Initialize Enhanced Input Integration (MyPC)
+    │
+    ├─→ Create Dynamic Input Action (MyPC, "IA_Jump", false)
+    │
+    ├─→ Map Key String To Dynamic Action (MyPC, "IA_Jump", "SpaceBar")
+    │
+    └─→ Wait For Input Action (MyPC, "IA_Jump", false)
+            ├── On Triggered ──→ Jump()
+            ├── On Started ────→ StartJumpCharge()
+            ├── On Ongoing ────→ UpdateJumpCharge()
+            ├── On Completed ──→ ReleaseJump()
+            ├── On Canceled ───→ CancelJump()
+            └── On Stopped ────→ CleanupJumpUI()  // When listener is stopped
+```
+
+**Canceling an Async Action:**
+
+```
+// Store reference to async action
+Wait For Input Action (MyPC, "IA_Jump") → Store as "JumpListener"
+
+// Later, cancel it when needed
+Stop Waiting For Input Action (JumpListener)
+```
+
+**C++ Usage (Approach C):**
+
+```cpp
+// Create async action and store reference
+UAsyncAction_WaitForInputAction* JumpListener =
+    UAsyncAction_WaitForInputAction::WaitForInputAction(this, MyPC, FName("IA_Jump"), false);
+
+// Bind to specific events
+JumpListener->OnTriggered.AddDynamic(this, &AMyCharacter::OnJumpTriggered);
+JumpListener->OnStarted.AddDynamic(this, &AMyCharacter::OnJumpStarted);
+JumpListener->OnCompleted.AddDynamic(this, &AMyCharacter::OnJumpCompleted);
+JumpListener->OnStopped.AddDynamic(this, &AMyCharacter::OnJumpListenerStopped);  // NEW!
+
+// Activate the listener
+JumpListener->Activate();
+
+// Later, cancel if needed (will fire OnStopped)
+JumpListener->Cancel();
+
+// Or use BPL function (will also fire OnStopped)
+UCPP_BPL_InputBinding::StopWaitingForInputAction(JumpListener);
+```
+
+### Which Approach Should I Use?
+
+| Scenario                   | Recommended Approach   |
+| -------------------------- | ---------------------- |
+| Simple game, few actions   | A (Global Dispatchers) |
+| Complex game, many actions | C (Async Nodes)        |
+| Centralized input manager  | A                      |
+| Per-widget/per-actor input | C                      |
+| Both at same time          | ✅ Works fine!         |
+
+**Note:** Both approaches can be used simultaneously - they both receive events from the same internal routing system.
+
 ## 📋 Naming Conventions
 
 All classes follow strict UE5 naming standards:
@@ -315,20 +721,20 @@ Files in this Base folder are accessible via:
 ## 📚 Next Phases
 
 - **Phase 3:** UI/UX Widgets (WBP_InputSettings_Main, WBP_InputBinding_Row, etc.)
-- **Phase 4:** Advanced conflict resolution and context-aware bindings
-- **Phase 5:** Enhanced Input System deep integration
-- **Phase 6-8:** Advanced features, testing, and documentation
+- **Phase 7:** Testing and performance benchmarks
+- **Phase 8:** Additional documentation and examples
 
 ## 👨‍💻 Development Guidelines
 
-1. **Modular Design** - Each module is independent and testable
-2. **Blueprint Exposure** - All public functions use `UFUNCTION(BlueprintCallable)`
-3. **Error Handling** - Validation and logging for all operations
-4. **Delegates** - Event-based communication between systems
-5. **Documentation** - Code comments follow Doxygen format for API docs
+1. **Per-Player Design** - All operations require PlayerController, no global state
+2. **Modular Design** - Each module is independent and testable
+3. **Blueprint Exposure** - All public functions use `UFUNCTION(BlueprintCallable)`
+4. **Error Handling** - Validation and logging for all operations
+5. **Delegates** - Event-based communication between systems
+6. **Documentation** - Code comments follow Doxygen format for API docs
 
 ---
 
 **Author:** Punal Manalan  
-**Version:** 1.0 (Phase 1-2 Complete)  
-**Last Updated:** December 6, 2025
+**Version:** 3.1 (Phase 0-6 Complete + Section 0.8 Blueprint Action Binding with OnStopped pin)  
+**Last Updated:** December 7, 2025

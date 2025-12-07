@@ -16,25 +16,25 @@
 USTRUCT(BlueprintType)
 struct FS_KeyBinding
 {
-GENERATED_BODY()
+    GENERATED_BODY()
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-FKey Key;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    FKey Key;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-float Value = 1.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    float Value = 1.0f;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-bool bShift = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    bool bShift = false;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-bool bCtrl = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    bool bCtrl = false;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-bool bAlt = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    bool bAlt = false;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-bool bCmd = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    bool bCmd = false;
 };
 
 /**
@@ -43,26 +43,44 @@ bool bCmd = false;
 USTRUCT(BlueprintType)
 struct FS_InputActionBinding
 {
-GENERATED_BODY()
+    GENERATED_BODY()
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-FName InputActionName;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    FName InputActionName;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-FText DisplayName;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    FText DisplayName;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-FName Category = FName(TEXT("General"));
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    FName Category = FName(TEXT("General"));
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-FText Description;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    FText Description;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-TArray<FS_KeyBinding> KeyBindings;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    TArray<FS_KeyBinding> KeyBindings;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-float Priority = 1.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    float Priority = 1.0f;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
-bool bEnabled = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    bool bEnabled = true;
+};
+
+/**
+ * Represents a conflict between two input actions
+ */
+USTRUCT(BlueprintType)
+struct FInputBindingConflict
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    FName ActionA;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Binding")
+    FName ActionB;
+
+    FInputBindingConflict() {}
+    FInputBindingConflict(const FName &InA, const FName &InB) : ActionA(InA), ActionB(InB) {}
 };
