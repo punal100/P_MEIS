@@ -6,6 +6,8 @@ A powerful, fully dynamic input binding system for Unreal Engine 5 that creates 
 
 - **100% Dynamic** - Create Input Actions and Mapping Contexts at runtime via C++ or Blueprint
 - **Per-Player Architecture** - Full split-screen/multiplayer support with independent bindings per player
+- **Blueprint Action Binding** - Global Event Dispatchers + Async Action Nodes for per-action events
+- **Modifier Key Support** - Map keys with Shift, Ctrl, Alt, Cmd combinations
 - **String to FKey** - Convert key names from strings (perfect for JSON configs, UI, etc.)
 - **Profile Template System** - Save/Load reusable profile templates with JSON persistence
 - **Conflict Detection** - Automatic detection of duplicate key bindings per player
@@ -293,14 +295,20 @@ void AMyCharacter::OnJump(const FInputActionValue& Value)
 }
 ```
 
-### Method 3: Global Delegate (Listen to ALL actions)
+### Method 3: Global Event Dispatchers (Approach A)
+
+P_MEIS provides global event dispatchers on the Integration class that fire for ALL actions. Use `ActionName` to filter:
 
 ```cpp
-// Get Integration and bind to global delegate
+// Get Integration and bind to global dispatchers
 UCPP_EnhancedInputIntegration* Integration = UCPP_BPL_InputBinding::GetIntegrationForPlayer(PC);
-Integration->OnDynamicInputAction.AddDynamic(this, &AMyCharacter::OnAnyInputAction);
 
-void AMyCharacter::OnAnyInputAction(FName ActionName, const FInputActionValue& Value)
+// Bind to specific trigger events
+Integration->OnActionTriggered.AddDynamic(this, &AMyCharacter::HandleAnyActionTriggered);
+Integration->OnActionStarted.AddDynamic(this, &AMyCharacter::HandleAnyActionStarted);
+Integration->OnActionCompleted.AddDynamic(this, &AMyCharacter::HandleAnyActionCompleted);
+
+void AMyCharacter::HandleAnyActionTriggered(FName ActionName, FInputActionValue Value)
 {
     if (ActionName == "IA_Jump")
     {
@@ -312,6 +320,94 @@ void AMyCharacter::OnAnyInputAction(FName ActionName, const FInputActionValue& V
     }
 }
 ```
+
+**Available Global Dispatchers:**
+
+| Dispatcher          | Description                                       |
+| ------------------- | ------------------------------------------------- |
+| `OnActionTriggered` | Main event - fires repeatedly while held for axis |
+| `OnActionStarted`   | Initial press                                     |
+| `OnActionOngoing`   | Held down (between Started and Triggered)         |
+| `OnActionCompleted` | Released after successful trigger                 |
+| `OnActionCanceled`  | Released before trigger threshold met             |
+
+### Method 4: Async Action Nodes (Approach C) - Blueprint Recommended
+
+Use the **"Wait For Input Action"** async node for per-action binding with multiple output pins:
+
+```
+Event BeginPlay
+    │
+    ├─→ Initialize Enhanced Input Integration (MyPC)
+    │
+    ├─→ Create Dynamic Input Action (MyPC, "IA_Jump", false)
+    │
+    ├─→ Map Key String To Dynamic Action (MyPC, "IA_Jump", "SpaceBar")
+    │
+    └─→ Wait For Input Action (MyPC, "IA_Jump", false)
+            ├── On Triggered ──→ Jump()
+            ├── On Started ────→ StartJumpCharge()
+            ├── On Ongoing ────→ UpdateJumpCharge()
+            ├── On Completed ──→ ReleaseJump()
+            ├── On Canceled ───→ CancelJump()
+            └── On Stopped ────→ CleanupJumpUI()  // When listener is stopped
+```
+
+**Output Pins:**
+
+| Pin          | Description                                                    |
+| ------------ | -------------------------------------------------------------- |
+| On Triggered | Fires when action is TRIGGERED (main event)                    |
+| On Started   | Fires when action is STARTED (initial press)                   |
+| On Ongoing   | Fires when action is ONGOING (held down)                       |
+| On Completed | Fires when action is COMPLETED (released after trigger)        |
+| On Canceled  | Fires when action is CANCELED (released before trigger)        |
+| On Stopped   | Fires when async node is STOPPED via Cancel() or StopWaiting() |
+
+**Canceling an Async Action:**
+
+```
+// Store reference to async action
+Wait For Input Action (MyPC, "IA_Jump") → Store as "JumpListener"
+
+// Later, cancel it when needed (fires OnStopped pin)
+Stop Waiting For Input Action (JumpListener)
+```
+
+**C++ Usage:**
+
+```cpp
+// Create async action and store reference
+UAsyncAction_WaitForInputAction* JumpListener =
+    UAsyncAction_WaitForInputAction::WaitForInputAction(this, MyPC, FName("IA_Jump"), false);
+
+// Bind to specific events
+JumpListener->OnTriggered.AddDynamic(this, &AMyCharacter::OnJumpTriggered);
+JumpListener->OnStarted.AddDynamic(this, &AMyCharacter::OnJumpStarted);
+JumpListener->OnCompleted.AddDynamic(this, &AMyCharacter::OnJumpCompleted);
+JumpListener->OnStopped.AddDynamic(this, &AMyCharacter::OnJumpListenerStopped);
+
+// Activate the listener
+JumpListener->Activate();
+
+// Later, cancel if needed (will fire OnStopped)
+JumpListener->Cancel();
+
+// Or use BPL function (will also fire OnStopped)
+UCPP_BPL_InputBinding::StopWaitingForInputAction(JumpListener);
+```
+
+### Which Approach Should I Use?
+
+| Scenario                        | Recommended Approach   |
+| ------------------------------- | ---------------------- |
+| Simple game, few actions        | A (Global Dispatchers) |
+| Complex game, many actions      | C (Async Nodes)        |
+| Centralized input manager class | A                      |
+| Per-widget/per-actor input      | C                      |
+| Both at same time               | ✅ Works fine!         |
+
+**Note:** Both approaches can be used simultaneously - they both receive events from the same internal routing system.
 
 ---
 
@@ -344,7 +440,8 @@ P_MEIS/
     │   ├── Validation/         # Input validation
     │   │   └── CPP_InputValidator.h/cpp
     │   └── Integration/        # Enhanced Input bridge
-    │       └── CPP_EnhancedInputIntegration.h/cpp
+    │       ├── CPP_EnhancedInputIntegration.h/cpp      # Integration wrapper + Global Dispatchers
+    │       └── CPP_AsyncAction_WaitForInputAction.h/cpp # Async Blueprint node (Approach C)
     ├── Private/
     │   └── P_MEIS.cpp
     └── Public/
@@ -402,6 +499,24 @@ P_MEIS/
 | `GetAllKeyNames()`                                 | Get list of all valid key names |
 | `MakeKeyBinding(KeyString, Shift, Ctrl, Alt, Cmd)` | Create key binding struct       |
 
+### Async Action Binding (Per-Action Events)
+
+| Function                                        | Description                               |
+| ----------------------------------------------- | ----------------------------------------- |
+| `WaitForInputAction(PC, ActionName, bOnlyOnce)` | Async node with 6 output pins             |
+| `StopWaitingForInputAction(AsyncAction)`        | Cancel async action (fires OnStopped pin) |
+| `TryBindPendingActions(PC)`                     | Bind actions queued before InputComponent |
+
+### Global Event Dispatchers (On Integration)
+
+| Dispatcher          | Description                          |
+| ------------------- | ------------------------------------ |
+| `OnActionTriggered` | Fires for all actions when TRIGGERED |
+| `OnActionStarted`   | Fires for all actions when STARTED   |
+| `OnActionOngoing`   | Fires for all actions when ONGOING   |
+| `OnActionCompleted` | Fires for all actions when COMPLETED |
+| `OnActionCanceled`  | Fires for all actions when CANCELED  |
+
 ---
 
 ## 💾 Profile Storage
@@ -445,6 +560,9 @@ Profiles are saved as JSON in: `[Project]/Saved/InputProfiles/`
 
 ## ⚡ Advanced Features
 
+- **Blueprint Action Binding** - Two approaches: Global Dispatchers (A) and Async Nodes (C) for per-action events
+- **Modifier Key Bindings** - Support for Shift+Key, Ctrl+Key, Alt+Key combinations via UInputTriggerChordAction
+- **Deferred Binding** - Actions queued when InputComponent not ready; bind later with TryBindPendingActions()
 - **Context-Aware Bindings** - Different bindings for Menu/Gameplay/Cutscene/Vehicle
 - **Macro System** - Record and playback input sequences
 - **Input Analytics** - Track most used keys, suggest unused keys
