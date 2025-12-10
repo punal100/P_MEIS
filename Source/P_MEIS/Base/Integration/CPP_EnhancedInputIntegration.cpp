@@ -41,14 +41,27 @@ bool UCPP_EnhancedInputIntegration::ApplyProfile(const FS_InputProfile &Profile)
     // Apply all axis bindings
     for (const FS_InputAxisBinding &AxisBinding : Profile.AxisBindings)
     {
+        UE_LOG(LogTemp, Log, TEXT("P_MEIS: ApplyProfile iterating - Axis: '%s', ValueType in Profile: %d"),
+               *AxisBinding.InputAxisName.ToString(), static_cast<int32>(AxisBinding.ValueType));
+
         if (!ApplyAxisBinding(AxisBinding))
         {
             UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Failed to apply axis binding: %s"), *AxisBinding.InputAxisName.ToString());
         }
     }
 
-    // Apply to player
-    return ApplyMappingContextToPlayer();
+    // Apply mapping context to player's Enhanced Input subsystem
+    if (!ApplyMappingContextToPlayer())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Failed to apply mapping context to player"));
+        return false;
+    }
+
+    // Bind action events AFTER mapping context is applied so callbacks work
+    // This hooks up the OnActionTriggered, OnActionStarted, etc. delegates
+    BindAllActionEvents();
+
+    return true;
 }
 
 bool UCPP_EnhancedInputIntegration::ApplyActionBinding(const FS_InputActionBinding &ActionBinding)
@@ -102,9 +115,11 @@ bool UCPP_EnhancedInputIntegration::ApplyAxisBinding(const FS_InputAxisBinding &
         return false;
     }
 
-    // Determine value type based on axis type
-    // For 2D movement, use Axis2D; for single axis, use Axis1D
-    EInputActionValueType ValueType = EInputActionValueType::Axis1D;
+    // Use the value type specified in the binding (defaults to Axis1D for backward compatibility)
+    EInputActionValueType ValueType = AxisBinding.ValueType;
+
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: ApplyAxisBinding '%s' - AxisBinding.ValueType: %d"),
+           *AxisBinding.InputAxisName.ToString(), static_cast<int32>(AxisBinding.ValueType));
 
     // Create or get the Input Action
     UInputAction *Action = CreateInputAction(AxisBinding.InputAxisName, ValueType);
@@ -127,23 +142,39 @@ bool UCPP_EnhancedInputIntegration::ApplyAxisBinding(const FS_InputAxisBinding &
         {
             FEnhancedActionKeyMapping &Mapping = MappingContext->MapKey(Action, KeyBinding.Key);
 
-            // Apply scale modifier if not 1.0
-            if (!FMath::IsNearlyEqual(KeyBinding.Scale, 1.0f))
+            // Apply swizzle modifier first (YXZ swaps X and Y, so X input goes to Y output)
+            if (KeyBinding.bSwizzleYXZ)
             {
-                UInputModifierScalar *ScaleModifier = NewObject<UInputModifierScalar>(Action);
-                ScaleModifier->Scalar = FVector(KeyBinding.Scale, KeyBinding.Scale, KeyBinding.Scale);
-                Mapping.Modifiers.Add(ScaleModifier);
+                UInputModifierSwizzleAxis *SwizzleModifier = NewObject<UInputModifierSwizzleAxis>(Action);
+                SwizzleModifier->Order = EInputAxisSwizzle::YXZ;
+                Mapping.Modifiers.Add(SwizzleModifier);
             }
 
-            // Apply negate if scale is negative or invert is set
-            if (KeyBinding.Scale < 0.0f || AxisBinding.bInvert)
+            // Apply negate if scale is negative
+            if (KeyBinding.Scale < 0.0f)
             {
                 UInputModifierNegate *NegateModifier = NewObject<UInputModifierNegate>(Action);
                 Mapping.Modifiers.Add(NegateModifier);
             }
 
-            UE_LOG(LogTemp, Log, TEXT("P_MEIS: Mapped axis key '%s' (scale: %.2f) to action '%s'"),
-                   *KeyBinding.Key.ToString(), KeyBinding.Scale, *AxisBinding.InputAxisName.ToString());
+            // Apply scale modifier if not 1.0 (use absolute value since negate handles sign)
+            float AbsScale = FMath::Abs(KeyBinding.Scale);
+            if (!FMath::IsNearlyEqual(AbsScale, 1.0f))
+            {
+                UInputModifierScalar *ScaleModifier = NewObject<UInputModifierScalar>(Action);
+                ScaleModifier->Scalar = FVector(AbsScale, AbsScale, AbsScale);
+                Mapping.Modifiers.Add(ScaleModifier);
+            }
+
+            // Apply invert if set on the axis binding
+            if (AxisBinding.bInvert)
+            {
+                UInputModifierNegate *NegateModifier = NewObject<UInputModifierNegate>(Action);
+                Mapping.Modifiers.Add(NegateModifier);
+            }
+
+            UE_LOG(LogTemp, Log, TEXT("P_MEIS: Mapped axis key '%s' (scale: %.2f, swizzle: %d) to action '%s'"),
+                   *KeyBinding.Key.ToString(), KeyBinding.Scale, KeyBinding.bSwizzleYXZ, *AxisBinding.InputAxisName.ToString());
         }
     }
 
@@ -722,14 +753,20 @@ bool UCPP_EnhancedInputIntegration::BindActionEvents(const FName &ActionName)
     APawn *Pawn = PlayerController->GetPawn();
     if (!Pawn)
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events - no Pawn found"));
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - no Pawn found (will be deferred)"), *ActionName.ToString());
+        return false;
+    }
+
+    if (!Pawn->InputComponent)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - Pawn has no InputComponent yet (will be deferred)"), *ActionName.ToString());
         return false;
     }
 
     UEnhancedInputComponent *EnhancedInputComponent = Cast<UEnhancedInputComponent>(Pawn->InputComponent);
     if (!EnhancedInputComponent)
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events - no EnhancedInputComponent found"));
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - no EnhancedInputComponent found"), *ActionName.ToString());
         return false;
     }
 
@@ -759,10 +796,24 @@ bool UCPP_EnhancedInputIntegration::BindActionEvents(const FName &ActionName)
 
 void UCPP_EnhancedInputIntegration::BindAllActionEvents()
 {
+    int32 BoundCount = 0;
+    int32 PendingCount = 0;
+
     for (const auto &ActionPair : CreatedInputActions)
     {
-        BindActionEvents(ActionPair.Key);
+        if (BindActionEvents(ActionPair.Key))
+        {
+            BoundCount++;
+        }
+        else
+        {
+            // Add to pending for deferred binding (e.g., when Pawn not yet available)
+            PendingBindActions.Add(ActionPair.Key);
+            PendingCount++;
+        }
     }
+
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: BindAllActionEvents - Bound: %d, Pending: %d"), BoundCount, PendingCount);
 }
 
 // ==================== Async Listener Management (Approach C) ====================

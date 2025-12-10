@@ -437,6 +437,13 @@ bool UCPP_InputBindingManager::ApplyPlayerProfileToEnhancedInput(APlayerControll
         return false;
     }
 
+    // Debug: Log all axis bindings and their value types
+    for (const FS_InputAxisBinding &AxisBinding : PlayerData->ActiveProfile.AxisBindings)
+    {
+        UE_LOG(LogTemp, Log, TEXT("P_MEIS: ApplyPlayerProfileToEnhancedInput - AxisBinding '%s' has ValueType: %d"),
+               *AxisBinding.InputAxisName.ToString(), static_cast<int32>(AxisBinding.ValueType));
+    }
+
     return PlayerData->Integration->ApplyProfile(PlayerData->ActiveProfile);
 }
 
@@ -521,6 +528,9 @@ bool UCPP_InputBindingManager::SetPlayerAxisBinding(APlayerController *PlayerCon
         return false;
     }
 
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: SetPlayerAxisBinding '%s' with ValueType: %d"),
+           *AxisName.ToString(), static_cast<int32>(Binding.ValueType));
+
     FS_InputAxisBinding *AxisBindingPtr = Profile->AxisBindings.FindByPredicate(
         [AxisName](const FS_InputAxisBinding &B)
         { return B.InputAxisName == AxisName; });
@@ -533,6 +543,9 @@ bool UCPP_InputBindingManager::SetPlayerAxisBinding(APlayerController *PlayerCon
     {
         *AxisBindingPtr = Binding;
     }
+
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: After SetPlayerAxisBinding '%s', stored ValueType: %d"),
+           *AxisName.ToString(), static_cast<int32>(AxisBindingPtr->ValueType));
 
     return true;
 }
