@@ -31,7 +31,14 @@ bool UCPP_InputProfileStorage::LoadProfile(const FName &ProfileName, FS_InputPro
 
     if (!FPaths::FileExists(*FilePath))
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Profile file not found: %s"), *FilePath);
+        if (IsRunningCommandlet())
+        {
+            UE_LOG(LogTemp, Log, TEXT("P_MEIS: Profile file not found: %s"), *FilePath);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Profile file not found: %s"), *FilePath);
+        }
         return false;
     }
 
