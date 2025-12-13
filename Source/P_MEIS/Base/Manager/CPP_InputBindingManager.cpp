@@ -17,7 +17,14 @@ void UCPP_InputBindingManager::Initialize(FSubsystemCollectionBase &Collection)
     // Load default template
     if (!LoadDefaultTemplate())
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Failed to load default profile template"));
+        if (IsRunningCommandlet())
+        {
+            UE_LOG(LogTemp, Log, TEXT("P_MEIS: Failed to load default profile template"));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Failed to load default profile template"));
+        }
     }
 
     UE_LOG(LogTemp, Log, TEXT("P_MEIS: Input Binding Manager Initialized (Per-Player Profile + Integration)"));
