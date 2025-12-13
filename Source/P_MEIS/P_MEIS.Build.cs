@@ -44,6 +44,8 @@ public class P_MEIS : ModuleRules
 				"InputCore",
 				"EnhancedInput",
 				"Projects",
+				"Json",
+				"JsonUtilities",
 			}
 			);
 
