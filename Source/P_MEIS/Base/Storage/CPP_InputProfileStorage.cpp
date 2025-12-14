@@ -148,12 +148,19 @@ FString UCPP_InputProfileStorage::SerializeProfileToJson(const FS_InputProfile &
         }
         JsonObject->SetArrayField(TEXT("ToggleModeActions"), ToggleModeActionsArray);
 
-        TArray<TSharedPtr<FJsonValue>> ActiveActionTogglesArray;
-        for (const FName &ActionName : Profile.bActiveActionToggles)
+        // Preferred explicit toggle-state map.
         {
-            ActiveActionTogglesArray.Add(MakeShareable(new FJsonValueString(ActionName.ToString())));
+            TSharedPtr<FJsonObject> ToggleStatesObj = MakeShareable(new FJsonObject());
+            for (const TPair<FName, bool> &Pair : Profile.ToggleActionStates)
+            {
+                if (Pair.Key.IsNone())
+                {
+                    continue;
+                }
+                ToggleStatesObj->SetBoolField(Pair.Key.ToString(), Pair.Value);
+            }
+            JsonObject->SetObjectField(TEXT("ToggleActionStates"), ToggleStatesObj);
         }
-        JsonObject->SetArrayField(TEXT("bActiveActionToggles"), ActiveActionTogglesArray);
     }
 
     // Serialize action bindings
@@ -291,19 +298,21 @@ bool UCPP_InputProfileStorage::DeserializeProfileFromJson(const FString &JsonStr
         }
     }
 
-    OutProfile.bActiveActionToggles.Empty();
-    const TArray<TSharedPtr<FJsonValue>> *ActiveActionTogglesArray = nullptr;
-    if (JsonObject->TryGetArrayField(TEXT("bActiveActionToggles"), ActiveActionTogglesArray))
+    // Preferred explicit toggle state map.
+    OutProfile.ToggleActionStates.Empty();
+    const TSharedPtr<FJsonObject> *ToggleStatesObjPtr = nullptr;
+    if (JsonObject->TryGetObjectField(TEXT("ToggleActionStates"), ToggleStatesObjPtr) && ToggleStatesObjPtr && ToggleStatesObjPtr->IsValid())
     {
-        for (const TSharedPtr<FJsonValue> &ActionValue : *ActiveActionTogglesArray)
+        for (const TPair<FString, TSharedPtr<FJsonValue>> &Pair : (*ToggleStatesObjPtr)->Values)
         {
-            FString ActionNameStr;
-            if (ActionValue->TryGetString(ActionNameStr))
+            bool bValue = false;
+            if (Pair.Value.IsValid() && Pair.Value->TryGetBool(bValue))
             {
-                OutProfile.bActiveActionToggles.Add(FName(*ActionNameStr));
+                OutProfile.ToggleActionStates.Add(FName(*Pair.Key), bValue);
             }
         }
     }
+    // If missing, default stays empty (all toggles OFF).
 
     // Deserialize action bindings
     OutProfile.ActionBindings.Empty();

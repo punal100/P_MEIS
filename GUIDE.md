@@ -29,7 +29,7 @@ This supports reuse across projects without coupling gameplay semantics into the
 - Profiles are persisted as JSON under: `Saved/InputProfiles/`
 - Profile data can include toggle semantics via:
   - `ToggleModeActions`: list of action names that behave as toggle instead of hold
-  - `bActiveActionToggles`: runtime toggle state persisted per profile
+  - `ToggleActionStates`: persisted per-action ON/OFF state (map from action name → bool)
 
 ## 4) UI input injection (mobile / UMG)
 

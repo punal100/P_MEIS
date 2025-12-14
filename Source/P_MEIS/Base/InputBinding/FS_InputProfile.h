@@ -45,17 +45,16 @@ struct FS_InputProfile
     TArray<FName> ToggleModeActions;
 
     /**
-     * Runtime state persisted per profile: actions that are currently toggled ON.
-     * NOTE: Names come from the game/module; P_MEIS does not hardcode any action names.
+     * Runtime state persisted per profile: explicit per-action toggle state.
      */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-    TArray<FName> bActiveActionToggles;
+    TMap<FName, bool> ToggleActionStates;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
     FDateTime Timestamp = FDateTime::Now();
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-    int32 Version = 3;
+    int32 Version = 4;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
     FString CreatedBy;

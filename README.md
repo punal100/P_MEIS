@@ -53,7 +53,7 @@ P_MEIS uses a **per-PlayerController architecture** - each player has their OWN 
 - Profiles persist as JSON under `Saved/InputProfiles/`.
 - Profile data can include:
   - `ToggleModeActions`: which action names behave as toggle instead of hold
-  - `bActiveActionToggles`: runtime toggle state persisted per profile
+  - `ToggleActionStates`: persisted per-action ON/OFF state (map from action name → bool)
 
 ### UI input injection (UMG/mobile)
 
