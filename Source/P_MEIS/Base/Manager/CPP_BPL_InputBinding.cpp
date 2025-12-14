@@ -328,6 +328,64 @@ bool UCPP_BPL_InputBinding::IsPlayerRegistered(APlayerController *PlayerControll
     return Manager->HasPlayerRegistered(PlayerController);
 }
 
+// ==================== UI / Virtual Device Injection ====================
+
+void UCPP_BPL_InputBinding::InjectActionStarted(APlayerController *PlayerController, const FName &ActionName)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (Integration)
+    {
+        Integration->InjectActionStarted(ActionName);
+    }
+}
+
+void UCPP_BPL_InputBinding::InjectActionTriggered(APlayerController *PlayerController, const FName &ActionName)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (Integration)
+    {
+        Integration->InjectActionTriggered(ActionName);
+    }
+}
+
+void UCPP_BPL_InputBinding::InjectActionCompleted(APlayerController *PlayerController, const FName &ActionName)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (Integration)
+    {
+        Integration->InjectActionCompleted(ActionName);
+    }
+}
+
+void UCPP_BPL_InputBinding::InjectAxis2D(APlayerController *PlayerController, const FName &AxisName, const FVector2D &Value)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    UCPP_EnhancedInputIntegration *Integration = GetIntegrationForPlayer(PlayerController);
+    if (Integration)
+    {
+        Integration->InjectAxis2D(AxisName, Value);
+    }
+}
+
 // ==================== Dynamic Input Action Creation (Multi-Player) ====================
 
 UInputAction *UCPP_BPL_InputBinding::CreateDynamicInputAction(APlayerController *PlayerController, const FName &ActionName, bool bIsAxis)

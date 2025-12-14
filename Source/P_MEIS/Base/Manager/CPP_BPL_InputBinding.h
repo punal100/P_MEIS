@@ -172,6 +172,24 @@ public:
     UFUNCTION(BlueprintPure, Category = "Input Binding|Player")
     static bool IsPlayerRegistered(APlayerController *PlayerController);
 
+    // ==================== UI / Virtual Device Injection ====================
+
+    /** Inject an action as Started (press down) for the given local player. */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    static void InjectActionStarted(APlayerController *PlayerController, const FName &ActionName);
+
+    /** Inject an action as Triggered (held / repeating) for the given local player. */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    static void InjectActionTriggered(APlayerController *PlayerController, const FName &ActionName);
+
+    /** Inject an action as Completed (release) for the given local player. */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    static void InjectActionCompleted(APlayerController *PlayerController, const FName &ActionName);
+
+    /** Inject a 2D axis value (e.g., virtual joystick) for the given local player. */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    static void InjectAxis2D(APlayerController *PlayerController, const FName &AxisName, const FVector2D &Value);
+
     // ==================== Dynamic Input Action Creation (Multi-Player) ====================
 
     /**

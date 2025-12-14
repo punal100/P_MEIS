@@ -917,6 +917,54 @@ void UCPP_EnhancedInputIntegration::OnActionCanceledInternal(const FInputActionI
     UE_LOG(LogTemp, Verbose, TEXT("P_MEIS: Action '%s' CANCELED"), *ActionName.ToString());
 }
 
+// ==================== UI / Virtual Device Injection ====================
+
+void UCPP_EnhancedInputIntegration::InjectActionStarted(const FName &ActionName)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    const FInputActionValue Value(true);
+    OnActionStarted.Broadcast(ActionName, Value);
+}
+
+void UCPP_EnhancedInputIntegration::InjectActionTriggered(const FName &ActionName)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    const FInputActionValue Value(true);
+    OnActionTriggered.Broadcast(ActionName, Value);
+    OnDynamicInputAction.Broadcast(ActionName, Value);
+}
+
+void UCPP_EnhancedInputIntegration::InjectActionCompleted(const FName &ActionName)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    const FInputActionValue Value(false);
+    OnActionCompleted.Broadcast(ActionName, Value);
+}
+
+void UCPP_EnhancedInputIntegration::InjectAxis2D(const FName &AxisName, const FVector2D &Value)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    const FInputActionValue InputValue(Value);
+    OnActionTriggered.Broadcast(AxisName, InputValue);
+    OnDynamicInputAction.Broadcast(AxisName, InputValue);
+}
+
 // ==================== Section 0.9: Dynamic Input Modifiers & Triggers ====================
 // TODO: Full implementation pending. These are stub implementations to satisfy linker.
 

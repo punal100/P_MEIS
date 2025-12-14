@@ -194,6 +194,24 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "P_MEIS|Action Events")
     FOnInputActionEvent OnActionCanceled;
 
+    // ==================== UI / Virtual Device Injection ====================
+
+    /** Inject an action as STARTED (press down) for this player (local-only). */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    void InjectActionStarted(const FName &ActionName);
+
+    /** Inject an action as TRIGGERED (held / repeating) for this player (local-only). */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    void InjectActionTriggered(const FName &ActionName);
+
+    /** Inject an action as COMPLETED (release) for this player (local-only). */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    void InjectActionCompleted(const FName &ActionName);
+
+    /** Inject a 2D axis value (e.g., virtual joystick) for this player (local-only). */
+    UFUNCTION(BlueprintCallable, Category = "P_MEIS|Injection")
+    void InjectAxis2D(const FName &AxisName, const FVector2D &Value);
+
     // ==================== Async Action Listener Management (Approach C) ====================
 
     /** Register an async action listener for specific action events */

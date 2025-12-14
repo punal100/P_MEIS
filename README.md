@@ -2,6 +2,8 @@
 
 A powerful, fully dynamic input binding system for Unreal Engine 5 that creates Input Actions, Mapping Contexts, and key bindings **entirely at runtime** - no editor assets required!
 
+For a quick project-oriented checklist, see [GUIDE.md](./GUIDE.md).
+
 ## 🌟 Key Features
 
 - **100% Dynamic** - Create Input Actions and Mapping Contexts at runtime via C++ or Blueprint
@@ -40,6 +42,25 @@ PublicDependencyModuleNames.AddRange(new string[] { "P_MEIS" });
 ## 🏗️ Architecture Overview
 
 P_MEIS uses a **per-PlayerController architecture** - each player has their OWN profile and integration, enabling true split-screen/multiplayer support with independent key bindings.
+
+### Project boundary (keep P_MEIS generic)
+
+- P_MEIS should remain **action-name-agnostic**. Do not hardcode gameplay semantics (e.g. specific action names like "Sprint") inside the plugin.
+- Game/UI code defines the action names it needs and uses P_MEIS purely as a binding + injection layer.
+
+### Profile persistence (this project)
+
+- Profiles persist as JSON under `Saved/InputProfiles/`.
+- Profile data can include:
+  - `ToggleModeActions`: which action names behave as toggle instead of hold
+  - `bActiveActionToggles`: runtime toggle state persisted per profile
+
+### UI input injection (UMG/mobile)
+
+If your project has UI controls (virtual joystick/buttons), inject into the local player’s integration so gameplay listens to one unified pipeline:
+
+- `InjectAxis2D(PC, ActionName, FVector2D)`
+- `InjectActionStarted/Triggered/Completed(PC, ActionName)`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐

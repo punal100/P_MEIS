@@ -64,7 +64,7 @@ enum class EInputTriggerType : uint8
  * Example Usage:
  * - Quick Fire: Use Pressed trigger
  * - Charge Attack: Use Hold with bIsOneShot = false
- * - Sprint Toggle: Use Tap trigger
+ * - Toggle-style action: Use Tap trigger
  * - Modifier Keys: Use ChordAction with ChordActionName
  */
 USTRUCT(BlueprintType)
@@ -131,7 +131,7 @@ struct P_MEIS_API FS_InputTriggerConfig
 
     /** Name of the action that must be triggering for this action to trigger.
      *  The referenced action must exist in the same Integration instance.
-     *  Example: "IA_Sprint" requires holding sprint before other actions work */
+     *  Example: "IA_Modifier" must be active before other actions fire */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chord", meta = (EditCondition = "TriggerType == EInputTriggerType::ChordAction"))
     FName ChordActionName;
 

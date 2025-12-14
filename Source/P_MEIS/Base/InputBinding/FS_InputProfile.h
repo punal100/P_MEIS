@@ -18,35 +18,51 @@
 USTRUCT(BlueprintType)
 struct FS_InputProfile
 {
-GENERATED_BODY()
+    GENERATED_BODY()
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-FName ProfileName;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    FName ProfileName;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-FText ProfileDescription;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    FText ProfileDescription;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-TArray<FS_InputActionBinding> ActionBindings;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    TArray<FS_InputActionBinding> ActionBindings;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-TArray<FS_InputAxisBinding> AxisBindings;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    TArray<FS_InputAxisBinding> AxisBindings;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-TArray<FS_InputModifier> Modifiers;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    TArray<FS_InputModifier> Modifiers;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-FDateTime Timestamp = FDateTime::Now();
+    // ==================== Game Preferences (Optional) ====================
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-int32 Version = 1;
+    /**
+     * Which actions behave as Toggle instead of Hold.
+     * NOTE: P_MEIS is modular; action names are provided by the game/module.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    TArray<FName> ToggleModeActions;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-FString CreatedBy;
+    /**
+     * Runtime state persisted per profile: actions that are currently toggled ON.
+     * NOTE: Names come from the game/module; P_MEIS does not hardcode any action names.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    TArray<FName> bActiveActionToggles;
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-bool bIsDefault = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    FDateTime Timestamp = FDateTime::Now();
 
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
-bool bIsCompetitive = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    int32 Version = 3;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    FString CreatedBy;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    bool bIsDefault = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Profile")
+    bool bIsCompetitive = false;
 };
