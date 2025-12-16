@@ -21,6 +21,7 @@
 #include "CPP_EnhancedInputIntegration.generated.h"
 
 class APlayerController;
+class AController;
 class UEnhancedInputComponent;
 class UInputMappingContext;
 class UInputAction;
@@ -71,6 +72,14 @@ public:
     /** Set the player controller to apply inputs to */
     UFUNCTION(BlueprintCallable, Category = "Input Binding|Integration")
     void SetPlayerController(APlayerController *InPlayerController);
+
+    /** Set the owning controller (supports AIController as well). */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Integration")
+    void SetController(AController *InController);
+
+    /** Get the current owning controller (may be AIController or PlayerController). */
+    UFUNCTION(BlueprintPure, Category = "Input Binding|Integration")
+    AController *GetController() const { return OwningController; }
 
     /** Get the current player controller */
     UFUNCTION(BlueprintPure, Category = "Input Binding|Integration")
@@ -474,6 +483,10 @@ private:
     UPROPERTY()
     APlayerController *PlayerController;
 
+    /** Owning controller for binding (PlayerController or AIController). */
+    UPROPERTY()
+    AController *OwningController;
+
     UPROPERTY()
     UInputMappingContext *MappingContext;
 
@@ -488,6 +501,9 @@ private:
 
     /** Track which actions have been bound to avoid duplicate bindings */
     TSet<FName> BoundActions;
+
+    /** Track which EnhancedInputComponent the current bindings are attached to. */
+    TWeakObjectPtr<UEnhancedInputComponent> BoundEnhancedInputComponent;
 
     /** Actions that couldn't be bound because EnhancedInputComponent wasn't ready
      *  These will be bound when TryBindPendingActions() is called */

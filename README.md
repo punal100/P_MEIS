@@ -43,6 +43,20 @@ PublicDependencyModuleNames.AddRange(new string[] { "P_MEIS" });
 
 P_MEIS uses a **per-PlayerController architecture** - each player has their OWN profile and integration, enabling true split-screen/multiplayer support with independent key bindings.
 
+### Binding location (recommended)
+
+For projects with pawn possession changes (or spectator/player switching), prefer binding gameplay input handlers on the **Controller's InputComponent**, not the Pawn's.
+
+- Controller InputComponent is typically stable across possession.
+- Pawn InputComponents can be re-created/changed when possession changes; if you bind on the pawn, ensure you re-bind when that happens.
+
+### Mapping contexts are local-player only
+
+Enhanced Input mapping contexts are applied via `UEnhancedInputLocalPlayerSubsystem`, which only exists for **local players**.
+
+- Local PlayerControllers: P_MEIS can create/apply dynamic mapping contexts.
+- AI Controllers: there is no local-player mapping context; use P_MEIS for action dispatch/injection patterns as needed.
+
 ### Project boundary (keep P_MEIS generic)
 
 - P_MEIS should remain **action-name-agnostic**. Do not hardcode gameplay semantics (e.g. specific action names like "Sprint") inside the plugin.

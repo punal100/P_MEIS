@@ -13,6 +13,7 @@
 #include "InputModifiers.h"
 #include "InputTriggers.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Controller.h"
 #include "Engine/LocalPlayer.h"
 
 // ==================== Profile Application ====================
@@ -50,11 +51,16 @@ bool UCPP_EnhancedInputIntegration::ApplyProfile(const FS_InputProfile &Profile)
         }
     }
 
-    // Apply mapping context to player's Enhanced Input subsystem
-    if (!ApplyMappingContextToPlayer())
+    // Apply mapping context to local player's Enhanced Input subsystem (players only)
+    // For AI / non-local controllers there is no LocalPlayer subsystem, so we skip this.
+    const bool bShouldApplyLocalPlayerContext = (PlayerController && PlayerController->IsLocalController());
+    if (bShouldApplyLocalPlayerContext)
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Failed to apply mapping context to player"));
-        return false;
+        if (!ApplyMappingContextToPlayer())
+        {
+            UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Failed to apply mapping context to player"));
+            return false;
+        }
     }
 
     // Bind action events AFTER mapping context is applied so callbacks work
@@ -186,9 +192,21 @@ bool UCPP_EnhancedInputIntegration::ApplyAxisBinding(const FS_InputAxisBinding &
 void UCPP_EnhancedInputIntegration::SetPlayerController(APlayerController *InPlayerController)
 {
     PlayerController = InPlayerController;
+    OwningController = InPlayerController;
 
     // If we have a mapping context, apply it to the new player controller
-    if (MappingContext && PlayerController)
+    if (MappingContext && PlayerController && PlayerController->IsLocalController())
+    {
+        ApplyMappingContextToPlayer();
+    }
+}
+
+void UCPP_EnhancedInputIntegration::SetController(AController *InController)
+{
+    OwningController = InController;
+    PlayerController = Cast<APlayerController>(InController);
+
+    if (MappingContext && PlayerController && PlayerController->IsLocalController())
     {
         ApplyMappingContextToPlayer();
     }
@@ -662,6 +680,12 @@ bool UCPP_EnhancedInputIntegration::ApplyMappingContextToPlayer()
         return false;
     }
 
+    if (!PlayerController->IsLocalController())
+    {
+        // Non-local controllers (including AI) do not have a LocalPlayer subsystem.
+        return false;
+    }
+
     if (!MappingContext)
     {
         UE_LOG(LogTemp, Warning, TEXT("P_MEIS: No MappingContext created"));
@@ -730,9 +754,9 @@ void UCPP_EnhancedInputIntegration::ApplyAxisModifiers(UInputAction *Action, con
 
 bool UCPP_EnhancedInputIntegration::BindActionEvents(const FName &ActionName)
 {
-    if (!PlayerController)
+    if (!OwningController)
     {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events - no PlayerController set"));
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events - no Controller set"));
         return false;
     }
 
@@ -743,31 +767,26 @@ bool UCPP_EnhancedInputIntegration::BindActionEvents(const FName &ActionName)
         return false;
     }
 
-    // Check if already bound
+    UEnhancedInputComponent *EnhancedInputComponent = Cast<UEnhancedInputComponent>(OwningController->InputComponent);
+    if (!EnhancedInputComponent)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - Controller has no EnhancedInputComponent"), *ActionName.ToString());
+        return false;
+    }
+
+    // If the input component changed (PIE travel / controller reinit), bindings must be rebuilt.
+    if (BoundEnhancedInputComponent.Get() != EnhancedInputComponent)
+    {
+        BoundActions.Reset();
+        PendingBindActions.Reset();
+        BoundEnhancedInputComponent = EnhancedInputComponent;
+    }
+
+    // Check if already bound (for this specific component)
     if (BoundActions.Contains(ActionName))
     {
         UE_LOG(LogTemp, Log, TEXT("P_MEIS: Action '%s' already bound"), *ActionName.ToString());
         return true;
-    }
-
-    APawn *Pawn = PlayerController->GetPawn();
-    if (!Pawn)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - no Pawn found (will be deferred)"), *ActionName.ToString());
-        return false;
-    }
-
-    if (!Pawn->InputComponent)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - Pawn has no InputComponent yet (will be deferred)"), *ActionName.ToString());
-        return false;
-    }
-
-    UEnhancedInputComponent *EnhancedInputComponent = Cast<UEnhancedInputComponent>(Pawn->InputComponent);
-    if (!EnhancedInputComponent)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot bind action events for '%s' - no EnhancedInputComponent found"), *ActionName.ToString());
-        return false;
     }
 
     // Bind all trigger events for this action

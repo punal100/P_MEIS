@@ -18,6 +18,7 @@
 
 class UCPP_EnhancedInputIntegration;
 class APlayerController;
+class AController;
 
 /**
  * Core input binding manager subsystem
@@ -51,6 +52,23 @@ public:
      */
     UFUNCTION(BlueprintCallable, Category = "Input Binding|Player")
     UCPP_EnhancedInputIntegration *RegisterPlayer(APlayerController *PlayerController);
+
+    // ==================== Controller Management (AI + Non-Player Controllers) ====================
+
+    /**
+     * Register a controller (e.g., AIController) and create its data (Profile + Integration)
+     * Note: Mapping contexts are only applied for local player controllers.
+     */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Controller")
+    UCPP_EnhancedInputIntegration *RegisterController(AController *Controller);
+
+    /** Unregister a controller and clean up its data */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Controller")
+    void UnregisterController(AController *Controller);
+
+    /** Get the Integration for a controller (lazy init if needed) */
+    UFUNCTION(BlueprintCallable, Category = "Input Binding|Controller")
+    UCPP_EnhancedInputIntegration *GetIntegrationForController(AController *Controller);
 
     /**
      * Unregister a player and clean up their data
@@ -494,11 +512,16 @@ protected:
     UPROPERTY()
     TMap<APlayerController *, FS_PlayerInputData> PlayerDataMap;
 
+    /** Map of Controller (e.g., AIController) to their input data (Profile + Integration) */
+    UPROPERTY()
+    TMap<AController *, FS_PlayerInputData> ControllerDataMap;
+
     // ==================== Helper Functions ====================
 
     bool LoadDefaultTemplate();
     void BroadcastBindingChanges(APlayerController *PlayerController);
     void CleanupInvalidPlayers();
+    void CleanupInvalidControllers();
     FS_PlayerInputData *GetPlayerData(APlayerController *PlayerController);
     const FS_PlayerInputData *GetPlayerData(APlayerController *PlayerController) const;
 };

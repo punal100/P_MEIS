@@ -9,6 +9,7 @@
 #include "Storage/CPP_InputProfileStorage.h"
 #include "Validation/CPP_InputValidator.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Controller.h"
 
 void UCPP_InputBindingManager::Initialize(FSubsystemCollectionBase &Collection)
 {
@@ -42,6 +43,18 @@ void UCPP_InputBindingManager::Deinitialize()
         }
     }
     PlayerDataMap.Empty();
+
+    // Clean up all controller data
+    for (auto &Pair : ControllerDataMap)
+    {
+        if (Pair.Value.Integration && Pair.Value.Integration->IsValidLowLevel())
+        {
+            Pair.Value.Integration->RemoveFromRoot();
+            Pair.Value.Integration->ConditionalBeginDestroy();
+        }
+    }
+    ControllerDataMap.Empty();
+
     ProfileTemplates.Empty();
 
     Super::Deinitialize();
@@ -98,6 +111,91 @@ UCPP_EnhancedInputIntegration *UCPP_InputBindingManager::RegisterPlayer(APlayerC
     UE_LOG(LogTemp, Log, TEXT("P_MEIS: Registered player %s with dedicated profile"), *PlayerController->GetName());
 
     return NewIntegration;
+}
+
+// ==================== Controller Management (AI + Non-Player Controllers) ====================
+
+UCPP_EnhancedInputIntegration *UCPP_InputBindingManager::RegisterController(AController *Controller)
+{
+    if (!Controller)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: Cannot register null Controller"));
+        return nullptr;
+    }
+
+    CleanupInvalidControllers();
+
+    if (FS_PlayerInputData *ExistingData = ControllerDataMap.Find(Controller))
+    {
+        if (ExistingData->IsValid())
+        {
+            UE_LOG(LogTemp, Log, TEXT("P_MEIS: Controller already registered, returning existing Integration"));
+            return ExistingData->Integration;
+        }
+    }
+
+    UCPP_EnhancedInputIntegration *NewIntegration = NewObject<UCPP_EnhancedInputIntegration>();
+    if (!NewIntegration)
+    {
+        UE_LOG(LogTemp, Error, TEXT("P_MEIS: Failed to create EnhancedInputIntegration"));
+        return nullptr;
+    }
+
+    NewIntegration->AddToRoot();
+    NewIntegration->SetController(Controller);
+
+    FS_PlayerInputData ControllerData;
+    ControllerData.Integration = NewIntegration;
+    ControllerData.ActiveProfile = FS_InputProfile();
+    ControllerData.ActiveProfile.ProfileName = FName(*FString::Printf(TEXT("Controller_%s"), *Controller->GetName()));
+    ControllerData.LoadedTemplateName = NAME_None;
+
+    ControllerDataMap.Add(Controller, ControllerData);
+    UE_LOG(LogTemp, Log, TEXT("P_MEIS: Registered controller %s with dedicated profile"), *Controller->GetName());
+
+    return NewIntegration;
+}
+
+void UCPP_InputBindingManager::UnregisterController(AController *Controller)
+{
+    if (!Controller)
+    {
+        return;
+    }
+
+    if (FS_PlayerInputData *ControllerData = ControllerDataMap.Find(Controller))
+    {
+        if (ControllerData->Integration && ControllerData->Integration->IsValidLowLevel())
+        {
+            ControllerData->Integration->ClearAllMappings();
+            ControllerData->Integration->RemoveFromRoot();
+            ControllerData->Integration->ConditionalBeginDestroy();
+        }
+
+        ControllerDataMap.Remove(Controller);
+        UE_LOG(LogTemp, Log, TEXT("P_MEIS: Unregistered controller %s"), *Controller->GetName());
+    }
+}
+
+UCPP_EnhancedInputIntegration *UCPP_InputBindingManager::GetIntegrationForController(AController *Controller)
+{
+    if (!Controller)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("P_MEIS: GetIntegrationForController called with null Controller"));
+        return nullptr;
+    }
+
+    CleanupInvalidControllers();
+
+    if (FS_PlayerInputData *ControllerData = ControllerDataMap.Find(Controller))
+    {
+        if (ControllerData->IsValid())
+        {
+            return ControllerData->Integration;
+        }
+    }
+
+    return RegisterController(Controller);
 }
 
 void UCPP_InputBindingManager::UnregisterPlayer(APlayerController *PlayerController)
@@ -272,6 +370,30 @@ void UCPP_InputBindingManager::CleanupInvalidPlayers()
             }
         }
         PlayerDataMap.Remove(PC);
+    }
+}
+
+void UCPP_InputBindingManager::CleanupInvalidControllers()
+{
+    TArray<AController *> InvalidControllers;
+    for (const auto &Pair : ControllerDataMap)
+    {
+        if (!Pair.Key || !Pair.Key->IsValidLowLevel() || !Pair.Value.IsValid())
+        {
+            InvalidControllers.Add(Pair.Key);
+        }
+    }
+
+    for (AController *Controller : InvalidControllers)
+    {
+        if (FS_PlayerInputData *ControllerData = ControllerDataMap.Find(Controller))
+        {
+            if (ControllerData->Integration && ControllerData->Integration->IsValidLowLevel())
+            {
+                ControllerData->Integration->RemoveFromRoot();
+            }
+        }
+        ControllerDataMap.Remove(Controller);
     }
 }
 

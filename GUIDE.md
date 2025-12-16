@@ -17,6 +17,20 @@ Blueprint flow (typical):
 - `Load Profile For Player (PC, "Default")`
   - If it fails (first run), create mappings then `Save Profile For Player`
 
+Project note (A_MiniFootball):
+
+- The gameplay controller provides a convenience wrapper `EnsureInputProfileReady("Default")` that registers the player, creates a `Default` template if missing, and applies it.
+
+Binding location (recommended):
+
+- Prefer binding gameplay actions on the **PlayerController's InputComponent** (stable across pawn possession).
+- Pawn InputComponents can be re-created/changed when possession changes; if you bind on the pawn, ensure you re-bind when the input component changes.
+
+Mapping contexts:
+
+- Enhanced Input mapping contexts are only applied for **local players** (via `UEnhancedInputLocalPlayerSubsystem`).
+- For AI controllers, you can still use P_MEIS as an action/event + injection layer, but there is no local-player mapping context.
+
 ## 2) Keep P_MEIS generic (important boundary)
 
 - P_MEIS should **not** hardcode action names like "Sprint".
