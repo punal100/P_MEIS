@@ -32,7 +32,7 @@
 param(
     [string]$ProjectPath = $null,
     [string]$UEPath = $null,
-    [switch]$SkipBuild,
+    [bool]$SkipBuild = $false,
     [switch]$RunTests,
     [int]$Timeout = 300,
     [switch]$VerboseOutput
@@ -147,8 +147,9 @@ if (-not $SkipBuild) {
     Write-Host ""
 }
 else {
-    Write-Log "Skipping build step (-SkipBuild)" -Level Warning
-    $results += "Build: SKIP"
+    Write-Log "Build step was skipped (-SkipBuild), but skipping Build is not allowed for this runner." -Level Error
+    $results += "Build: FAIL (SKIPPED)"
+    $allPassed = $false
     Write-Host ""
 }
 
